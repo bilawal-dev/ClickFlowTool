@@ -1,0 +1,19 @@
+{
+  "name": "clickup-flowchart",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev-clean": "rm -rf node_modules/.vite && npm run dev"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.8.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.0.0",
+    "vite": "4.5.14"
+  }
+}

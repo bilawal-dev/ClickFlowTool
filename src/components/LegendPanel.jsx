@@ -1,103 +1,47 @@
+import { Edit, Target, Link2, Trash2, Mouse, Hand, Save } from 'lucide-react'
+
 export default function LegendPanel() {
     return (
-        <div style={{
-            position: 'absolute',
-            top: 16,
-            right: 16,
-            zIndex: 10,
-            background: '#ffffff',
-            padding: '16px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            fontSize: '14px',
-            maxWidth: '280px',
-            border: '1px solid #e5e7eb'
-        }}>
-            <div style={{
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '12px',
-                fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-            }}>
-                <span>✏️</span>
+        <div className="absolute top-4 right-4 z-10 bg-white p-4 rounded-lg shadow-md text-sm max-w-[280px] border border-gray-200">
+            <div className="font-medium text-gray-700 mb-3 text-sm flex items-center gap-1.5">
+                <Edit size={16} className="text-blue-600" />
                 <span>Editor Guide</span>
             </div>
-            <div style={{ color: '#4b5563', lineHeight: '1.4', fontSize: '11px' }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '6px',
-                    marginBottom: '6px',
-                    padding: '2px 0'
-                }}>
-                    <span style={{ minWidth: '16px' }}>🎯</span>
+            <div className="flex flex-col gap-1.5 text-gray-600 leading-5 text-xs">
+                <div className="flex items-start gap-1.5">
+                    <Target size={16} className="min-w-4 text-green-600 mt-0.5" />
                     <div>
-                        <strong style={{ color: '#374151' }}>Right-click nodes:</strong> Edit text & handles
+                        <strong className="text-gray-700">Right-click nodes:</strong> Edit text & handles
                     </div>
                 </div>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '6px',
-                    marginBottom: '6px',
-                    padding: '2px 0'
-                }}>
-                    <span style={{ minWidth: '16px' }}>🔗</span>
+                <div className="flex items-start gap-1.5">
+                    <Link2 size={16} className="min-w-4 text-blue-600 mt-0.5" />
                     <div>
-                        <strong style={{ color: '#374151' }}>Drag handles:</strong> Create connections
+                        <strong className="text-gray-700">Drag handles:</strong> Create connections
                     </div>
                 </div>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '6px',
-                    marginBottom: '6px',
-                    padding: '2px 0'
-                }}>
-                    <span style={{ minWidth: '16px' }}>🗑️</span>
+                <div className="flex items-start gap-1.5">
+                    <Trash2 size={16} className="min-w-4 text-red-600 mt-0.5" />
                     <div>
-                        <strong style={{ color: '#374151' }}>Delete:</strong> Select edge + Delete key
+                        <strong className="text-gray-700">Delete:</strong> Select edge + Delete key
                     </div>
                 </div>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '6px',
-                    marginBottom: '6px',
-                    padding: '2px 0'
-                }}>
-                    <span style={{ minWidth: '16px' }}>🖱️</span>
+                <div className="flex items-start gap-1.5">
+                    <Mouse size={16} className="min-w-4 text-purple-600 mt-0.5" />
                     <div>
-                        <strong style={{ color: '#374151' }}>Multi-select:</strong> Shift + Click
+                        <strong className="text-gray-700">Multi-select:</strong> Shift + Click
                     </div>
                 </div>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '6px',
-                    marginBottom: '6px',
-                    padding: '2px 0'
-                }}>
-                    <span style={{ minWidth: '16px' }}>✋</span>
+                <div className="flex items-start gap-1.5">
+                    <Hand size={16} className="min-w-4 text-orange-600 mt-0.5" />
                     <div>
-                        <strong style={{ color: '#374151' }}>Hand tool:</strong> Hold 'H' to pan with left-click
+                        <strong className="text-gray-700">Hand tool:</strong> Hold 'H' to pan with left-click
                     </div>
                 </div>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '6px',
-                    padding: '2px 0',
-                    borderTop: '1px solid rgba(229, 231, 235, 0.6)',
-                    marginTop: '8px',
-                    paddingTop: '8px'
-                }}>
-                    <span style={{ minWidth: '16px' }}>💾</span>
-                    <div style={{ fontStyle: 'italic', color: '#6b7280' }}>
-                        <strong style={{ color: '#d97706' }}>Save Layout:</strong> Sets current as default
+                <div className="flex items-start gap-1.5 py-0.5 border-t border-gray-200/60 mt-2 pt-2">
+                    <Save size={16} className="min-w-4 text-amber-600 mt-0.5" />
+                    <div className="italic text-gray-500">
+                        <strong className="text-amber-600">Save Layout:</strong> Sets current as default
                     </div>
                 </div>
             </div>

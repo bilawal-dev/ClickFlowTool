@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ReactFlow, useNodesState, useEdgesState, useReactFlow, Handle, Position } from '@xyflow/react';
+import { ReactFlow, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react';
+import { Settings, Hand, RotateCcw, CheckCircle, XCircle, FolderOpen, Folder, Save, Link, TestTube, X, MapPin, Edit, Check, ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import UniversalNode from './UniversalNode';
 import HeaderNode from './HeaderNode';
 import LegendPanel from './LegendPanel';
-import { clickupApi, KNOWN_IDS, PHASE_MAPPING } from '../services/clickupApi';
+import { clickupApi} from '../services/clickupApi';
 
 
 // Node type mapping for ReactFlow - ALL use Universal node with full handle support
@@ -878,280 +879,77 @@ export default function FlowChart() {
   return (
     <>
       {/* Clean Control Panel - Matching Legend Style */}
-      <div style={{
-        position: 'absolute',
-        top: 16,
-        left: 16,
-        zIndex: 10,
-        background: '#ffffff',
-        padding: '16px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #e5e7eb',
-        fontSize: '14px',
-        maxWidth: '400px'
-      }}>
-        <div style={{
-          fontWeight: '500',
-          color: '#374151',
-          marginBottom: '12px',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
-          <span>⚙️</span>
+      <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-lg shadow-md border border-gray-200 text-sm max-w-[430px]">
+        <div className="font-medium text-gray-700 mb-3 text-sm flex items-center gap-1.5">
+          <Settings size={16} className="text-blue-600" />
           <span>Controls</span>
           {isHandToolActive && (
-            <span style={{
-              background: '#10b981',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}>
-              ✋ HAND
+            <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+              <Hand size={12} />
+              HAND
             </span>
           )}
           {isLoadingClickupData && (
-            <span style={{
-              background: '#f59e0b',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}>
-              🔄 LOADING
+            <span className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+              <RotateCcw size={12} className="animate-spin" />
+              LOADING
             </span>
           )}
           {!isLoadingClickupData && clickupData && (
-            <span style={{
-              background: '#10b981',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}>
-              ✅ CLICKUP
+            <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+              <CheckCircle size={12} />
+              CLICKUP
             </span>
           )}
           {!isLoadingClickupData && !clickupData && (
-            <span style={{
-              background: '#ef4444',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}>
-              ❌ ERROR
+            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+              <XCircle size={12} />
+              ERROR
             </span>
           )}
         </div>
 
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          alignItems: 'center'
-        }}>
+        <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={toggleAllTasks}
-            style={{
-              background: '#ffffff',
-              border: '1px solid #d1d5db',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: '#374151',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={e => {
-              e.target.style.borderColor = '#9ca3af';
-              e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseLeave={e => {
-              e.target.style.borderColor = '#d1d5db';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-            }}
-            onMouseDown={e => {
-              e.target.style.transform = 'translateY(1px)';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseUp={e => {
-              e.target.style.transform = 'translateY(0px)';
-            }}
+            className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
           >
-            <span>{showAllTasks ? '📁' : '📂'}</span>
+            {showAllTasks ? <FolderOpen size={14} /> : <Folder size={14} />}
             <span>{showAllTasks ? 'Collapse' : 'Expand'}</span>
           </button>
 
           <button
             onClick={saveCurrentLayoutAsDefault}
-            style={{
-              background: '#ffffff',
-              border: '1px solid #d1d5db',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: '#374151',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={e => {
-              e.target.style.borderColor = '#9ca3af';
-              e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseLeave={e => {
-              e.target.style.borderColor = '#d1d5db';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-            }}
-            onMouseDown={e => {
-              e.target.style.transform = 'translateY(1px)';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseUp={e => {
-              e.target.style.transform = 'translateY(0px)';
-            }}
+            className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
           >
-            <span>💾</span>
+            <Save size={14} />
             <span>Save Layout</span>
           </button>
 
-          <div style={{ position: 'relative' }}>
+          <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              style={{
-                background: '#ffffff',
-                border: '1px solid #d1d5db',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontWeight: '500',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={e => {
-                e.target.style.borderColor = '#9ca3af';
-                e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-              }}
-              onMouseLeave={e => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-              }}
-              onMouseDown={e => {
-                e.target.style.transform = 'translateY(1px)';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-              }}
-              onMouseUp={e => {
-                e.target.style.transform = 'translateY(0px)';
-              }}
+              className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
             >
-              <span>🔄</span>
+              <RotateCcw size={14} />
               <span>Reset</span>
-              <span style={{
-                fontSize: '8px',
-                transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.15s ease'
-              }}>▼</span>
+              <span className={`text-xs transition-transform duration-150 ease-in-out ${showDropdown ? 'rotate-180' : 'rotate-0'}`}>▼</span>
             </button>
 
             {showDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '42px',
-                left: 0,
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                zIndex: 1000,
-                minWidth: '140px',
-                padding: '4px'
-              }}>
+              <div className="absolute top-[42px] left-0 bg-white border border-gray-200 rounded-md shadow-lg z-[1000] min-w-[140px] p-1">
                 <button
                   onClick={() => { resetView(); setShowDropdown(false); }}
-                  style={{
-                    width: '100%',
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={e => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
                 >
-                  <span>🔄</span>
+                  <RotateCcw size={12} />
                   <span>Reset View</span>
                 </button>
                 <button
                   onClick={() => { resetNodePositions(); setShowDropdown(false); }}
-                  style={{
-                    width: '100%',
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={e => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
                 >
-                  <span>📍</span>
+                  <MapPin size={12} />
                   <span>Reset Positions</span>
                 </button>
                 <button
@@ -1160,29 +958,9 @@ export default function FlowChart() {
                     setNodeHandleConfigs({});
                     setShowDropdown(false);
                   }}
-                  style={{
-                    width: '100%',
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={e => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
                 >
-                  <span>🔗</span>
+                  <Link size={12} />
                   <span>Reset Handles</span>
                 </button>
                 <button
@@ -1192,29 +970,9 @@ export default function FlowChart() {
                     setEdges(getVisibleEdges());
                     setShowDropdown(false);
                   }}
-                  style={{
-                    width: '100%',
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={e => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
                 >
-                  <span>🔗</span>
+                  <Link size={12} />
                   <span>Reset Connections</span>
                 </button>
                 <button
@@ -1223,29 +981,9 @@ export default function FlowChart() {
                     setNodeLabels({});
                     setShowDropdown(false);
                   }}
-                  style={{
-                    width: '100%',
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={e => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
                 >
-                  <span>📝</span>
+                  <RotateCcw size={12} />
                   <span>Reset Text</span>
                 </button>
               </div>
@@ -1259,31 +997,7 @@ export default function FlowChart() {
               else focusLevel(level);
               e.target.value = "0";
             }}
-            style={{
-              background: '#ffffff',
-              border: '1px solid #d1d5db',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: '#374151',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-              appearance: 'none',
-              backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L2 5h8z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 8px center',
-              paddingRight: '32px'
-            }}
-            onMouseEnter={e => {
-              e.target.style.borderColor = '#9ca3af';
-              e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseLeave={e => {
-              e.target.style.borderColor = '#d1d5db';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-            }}
+            className="bg-white border border-gray-300 px-3 py-2 pr-8 rounded-md cursor-pointer text-xs text-gray-700 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M6%209L2%205h8z%22/%3E%3C/svg%3E')] bg-no-repeat bg-[right_8px_center]"
           >
             <option value="0">📍 Navigate</option>
             <option value="1">📍 CRM</option>
@@ -1293,38 +1007,9 @@ export default function FlowChart() {
 
           <button
             onClick={() => setShowHandles(!showHandles)}
-            style={{
-              background: showHandles ? '#f3f4f6' : '#ffffff',
-              border: '1px solid #d1d5db',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: '#374151',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={e => {
-              e.target.style.borderColor = '#9ca3af';
-              e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseLeave={e => {
-              e.target.style.borderColor = '#d1d5db';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-            }}
-            onMouseDown={e => {
-              e.target.style.transform = 'translateY(1px)';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseUp={e => {
-              e.target.style.transform = 'translateY(0px)';
-            }}
+            className={`${showHandles ? 'bg-gray-100' : 'bg-white'} border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm`}
           >
-            <span>🔗</span>
+            <Link size={14} />
             <span>{showHandles ? 'Hide Handles' : 'Show Handles'}</span>
           </button>
 
@@ -1340,38 +1025,9 @@ export default function FlowChart() {
                 alert(`❌ API Test Failed: ${error.message}`);
               }
             }}
-            style={{
-              background: '#ffffff',
-              border: '1px solid #d1d5db',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: '#374151',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={e => {
-              e.target.style.borderColor = '#9ca3af';
-              e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseLeave={e => {
-              e.target.style.borderColor = '#d1d5db';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-            }}
-            onMouseDown={e => {
-              e.target.style.transform = 'translateY(1px)';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseUp={e => {
-              e.target.style.transform = 'translateY(0px)';
-            }}
+            className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
           >
-            <span>🧪</span>
+            <TestTube size={14} />
             <span>Test ClickUp API</span>
           </button>
         </div>
@@ -1383,40 +1039,20 @@ export default function FlowChart() {
       {/* Clean Context Menu for Handle Configuration */}
       {contextMenu && (
         <div
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-[1000] min-w-[240px]"
           style={{
-            position: 'fixed',
             top: contextMenu.y,
             left: contextMenu.x,
-            background: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-            padding: '16px',
-            zIndex: 1000,
-            minWidth: '240px'
           }}
         >
-          <div style={{
-            fontWeight: '600',
-            marginBottom: '12px',
-            fontSize: '14px',
-            color: '#1f2937',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span>✏️</span>
+          <div className="font-semibold mb-3 text-sm text-gray-800 flex items-center gap-2">
+            <Edit size={16} className="text-blue-600" />
             <span>Edit Node</span>
           </div>
 
           {/* Text Editing Section */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{
-              fontSize: '12px',
-              color: '#4b5563',
-              marginBottom: '8px',
-              fontWeight: '500'
-            }}>
+          <div className="mb-5">
+            <div className="text-xs text-gray-600 mb-2 font-medium">
               Edit Node Text:
             </div>
             <input
@@ -1428,158 +1064,64 @@ export default function FlowChart() {
                   saveEditedText(contextMenu.nodeId);
                 }
               }}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px',
-                marginBottom: '10px',
-                outline: 'none',
-                transition: 'border-color 0.15s ease',
-                background: '#ffffff',
-                color: '#374151'
-              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2.5 outline-none transition-colors duration-150 ease-in-out bg-white text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Enter new text..."
               autoFocus
-              onFocus={e => {
-                e.target.style.borderColor = '#3b82f6';
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = '#d1d5db';
-              }}
             />
             <button
               onClick={() => saveEditedText(contextMenu.nodeId)}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                borderRadius: '6px',
-                background: '#10b981',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                width: '100%',
-                marginBottom: '16px',
-                transition: 'opacity 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-              onMouseEnter={e => {
-                e.target.style.opacity = '0.9';
-              }}
-              onMouseLeave={e => {
-                e.target.style.opacity = '1';
-              }}
+              className="px-3 py-2 border-none rounded-md bg-emerald-500 text-white cursor-pointer text-sm font-medium w-full mb-4 transition-opacity duration-150 ease-in-out flex items-center justify-center gap-1.5 hover:opacity-90"
             >
-              <span>💾</span>
+              <Save size={14} />
               <span>Save Text</span>
             </button>
           </div>
 
           {/* Handles Section */}
-          <div style={{
-            fontSize: '12px',
-            color: '#4b5563',
-            marginBottom: '10px',
-            fontWeight: '500'
-          }}>
+          <div className="text-xs text-gray-600 mb-2.5 font-medium">
             Connection Handles (click to toggle):
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-            {['top', 'right', 'bottom', 'left'].map(position => (
-              <button
-                key={position}
-                onClick={() => toggleNodeHandle(contextMenu.nodeId, position)}
-                style={{
-                  padding: '8px 12px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  background: contextMenu.currentConfig[position]
-                    ? '#10b981'
-                    : '#ef4444',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'opacity 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px'
-                }}
-                onMouseEnter={e => {
-                  e.target.style.opacity = '0.9';
-                }}
-                onMouseLeave={e => {
-                  e.target.style.opacity = '1';
-                }}
-              >
-                <span>{position.charAt(0).toUpperCase() + position.slice(1)}</span>
-                <span>{contextMenu.currentConfig[position] ? '✓' : '✗'}</span>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {['top', 'right', 'bottom', 'left'].map(position => {
+              const getIcon = (pos) => {
+                switch (pos) {
+                  case 'top': return <ArrowUp size={12} />;
+                  case 'right': return <ArrowRight size={12} />;
+                  case 'bottom': return <ArrowDown size={12} />;
+                  case 'left': return <ArrowLeft size={12} />;
+                  default: return null;
+                }
+              };
+
+              return (
+                <button
+                  key={position}
+                  onClick={() => toggleNodeHandle(contextMenu.nodeId, position)}
+                  className={`px-3 py-2 border-none rounded-md text-white cursor-pointer text-sm font-medium transition-opacity duration-150 ease-in-out flex items-center justify-center gap-1 hover:opacity-90 ${contextMenu.currentConfig[position] ? 'bg-emerald-500' : 'bg-red-500'
+                    }`}
+                >
+                  {getIcon(position)}
+                  <span>{position.charAt(0).toUpperCase() + position.slice(1)}</span>
+                  {contextMenu.currentConfig[position] ? <Check size={12} /> : <X size={12} />}
+                </button>
+              );
+            })}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             <button
               onClick={() => resetNodeHandles(contextMenu.nodeId)}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                borderRadius: '6px',
-                background: '#3b82f6',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                flex: 1,
-                transition: 'opacity 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-              onMouseEnter={e => {
-                e.target.style.opacity = '0.9';
-              }}
-              onMouseLeave={e => {
-                e.target.style.opacity = '1';
-              }}
+              className="px-3 py-2 border-none rounded-md bg-blue-500 text-white cursor-pointer text-sm font-medium flex-1 transition-opacity duration-150 ease-in-out flex items-center justify-center gap-1.5 hover:opacity-90"
             >
-              <span>🔄</span>
+              <RotateCcw size={14} />
               <span>Reset All</span>
             </button>
             <button
               onClick={closeContextMenu}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                borderRadius: '6px',
-                background: '#6b7280',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                flex: 1,
-                transition: 'opacity 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-              onMouseEnter={e => {
-                e.target.style.opacity = '0.9';
-              }}
-              onMouseLeave={e => {
-                e.target.style.opacity = '1';
-              }}
+              className="px-3 py-2 border-none rounded-md bg-gray-500 text-white cursor-pointer text-sm font-medium flex-1 transition-opacity duration-150 ease-in-out flex items-center justify-center gap-1.5 hover:opacity-90"
             >
-              <span>✕</span>
+              <X size={14} />
               <span>Close</span>
             </button>
           </div>
@@ -1588,26 +1130,8 @@ export default function FlowChart() {
 
       {/* Scroll Back To Content Button */}
       {isOutOfBounds && (
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 1000,
-          background: '#1976d2',
-          color: 'white',
-          padding: '12px 20px',
-          borderRadius: '25px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '600',
-          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          transition: 'all 0.2s ease',
-          border: 'none'
-        }}
+        <div
+          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[1000] bg-[#1976d2] text-white px-5 py-3 rounded-full cursor-pointer text-sm font-semibold shadow-[0_4px_12px_rgba(25,118,210,0.3)] flex items-center gap-2 transition-all duration-200 ease-in-out border-none"
           onClick={resetView}
         >
           <span>Scroll Back To Content</span>
@@ -1616,49 +1140,23 @@ export default function FlowChart() {
 
       {/* Loading State */}
       {isLoadingClickupData && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(248, 249, 250, 0.95)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          flexDirection: 'column',
-          gap: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '40px',
-            borderRadius: '12px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-            textAlign: 'center',
-            maxWidth: '400px'
-          }}>
-            <div style={{
-              fontSize: '48px',
-              marginBottom: '20px',
-              animation: 'spin 2s linear infinite'
-            }}>
-              🔄
+        <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center z-[2000]">
+          <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md mx-4 border border-gray-100">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-blue-100 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+                <Loader2 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-500" size={24} />
+              </div>
             </div>
-            <div style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#1f2937',
-              marginBottom: '12px'
-            }}>
-              Loading ClickUp Data
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6b7280',
-              lineHeight: '1.5'
-            }}>
-              Fetching real project phases and tasks from ClickUp...
+            <h3 className="text-xl font-bold text-gray-900 mb-3">Loading ClickUp Data</h3>
+            <p className="text-gray-600 leading-relaxed">
+              Fetching real project phases and tasks from ClickUp workspace...
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-blue-600">
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse animation-delay-150"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse animation-delay-300"></div>
             </div>
           </div>
         </div>
@@ -1666,49 +1164,25 @@ export default function FlowChart() {
 
       {/* Error State */}
       {!isLoadingClickupData && !clickupData && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(248, 249, 250, 0.95)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          flexDirection: 'column',
-          gap: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '40px',
-            borderRadius: '12px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-            textAlign: 'center',
-            maxWidth: '500px'
-          }}>
-            <div style={{
-              fontSize: '48px',
-              marginBottom: '20px'
-            }}>
-              ⚠️
+        <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center z-[2000]">
+          <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-lg mx-4 border border-gray-100">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+                <AlertTriangle className="text-red-500" size={32} />
+              </div>
             </div>
-            <div style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#1f2937',
-              marginBottom: '12px'
-            }}>
-              ClickUp Data Unavailable
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6b7280',
-              lineHeight: '1.5',
-              marginBottom: '24px'
-            }}>
+            <h3 className="text-xl font-bold text-gray-900 mb-3">ClickUp Data Unavailable</h3>
+            <p className="text-gray-600 leading-relaxed mb-6">
               Unable to load ClickUp project data. Please check your API token configuration and internet connection.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={16} />
+                <div className="text-left">
+                  <p className="text-sm font-medium text-red-800 mb-1">Connection Failed</p>
+                  <p className="text-xs text-red-600">Verify your ClickUp API token and network connectivity</p>
+                </div>
+              </div>
             </div>
             <button
               onClick={async () => {
@@ -1724,29 +1198,9 @@ export default function FlowChart() {
                   setIsLoadingClickupData(false);
                 }
               }}
-              style={{
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                margin: '0 auto',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={e => {
-                e.target.style.background = '#2563eb';
-              }}
-              onMouseLeave={e => {
-                e.target.style.background = '#3b82f6';
-              }}
+              className="bg-blue-500 hover:bg-blue-600 text-white border-none px-6 py-3 rounded-lg cursor-pointer text-sm font-semibold flex items-center gap-2 mx-auto transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              <span>🔄</span>
+              <RefreshCw size={16} />
               <span>Retry Loading</span>
             </button>
           </div>
@@ -1763,10 +1217,7 @@ export default function FlowChart() {
         onNodeContextMenu={handleNodeContextMenu}
         onViewportChange={handleViewportChange}
         defaultViewport={loadSavedViewport()}
-        style={{
-          background: '#f8f9fa',
-          cursor: isHandToolActive ? 'grab' : 'default'
-        }}
+        className={`bg-[#f8f9fa] ${isHandToolActive ? 'cursor-grab' : 'cursor-default'}`}
         nodeTypes={nodeTypes}
         multiSelectionKeyCode="Shift"
         panOnDrag={isHandToolActive ? [0, 1, 2] : [1, 2]}

@@ -39,6 +39,7 @@ export default function FlowChart() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true); // Track full initialization
   
   const reactFlowInstance = useReactFlow();
 
@@ -570,38 +571,86 @@ export default function FlowChart() {
     loadSavedNodeLabels();
   }, []);
 
-  // 🔄 Load ClickUp data on component mount
+  // 🔄 Load template data for flowchart structure (only when no project is selected)
   useEffect(() => {
-    const loadClickUpData = async () => {
-      if (!selectedProject) {
-        console.log('⏳ No project selected yet, waiting for projects to load...');
-        return;
+    const loadTemplateData = async () => {
+      if (selectedProject) {
+        console.log('⏭️ Project already selected, skipping template-only load');
+        return; // Don't load template if we already have a project
       }
 
-      console.log(`🔄 Loading project data for: ${selectedProject.name}`);
-      setIsLoadingClickupData(true);
+      console.log('🔄 Loading template structure as fallback...');
+      // Don't set loading during initialization - handled by isInitializing
 
       try {
-        const processedData = await clickupApi.getProcessedProjectData(selectedProject.id);
-        console.log('✅ Project data loaded successfully:', processedData);
+        const processedData = await clickupApi.getProcessedTemplateData();
+        console.log('✅ Template structure loaded as fallback:', processedData);
         setClickupData(processedData);
 
       } catch (error) {
-        console.error('❌ Failed to load ClickUp data:', error);
+        console.error('❌ Failed to load template data:', error);
         // Keep clickupData as null, will fall back to hardcoded data
+      }
+      // Don't end loading here - handled by initialization coordination
+    };
+
+    // Load template data as fallback only when switching back to no project
+    if (selectedProject === null && !isInitializing) {
+      loadTemplateData();
+    }
+  }, [selectedProject, isInitializing]); // Re-run when selectedProject changes to null
+
+  // 🎯 Load real project tasks when location is selected
+  useEffect(() => {
+    const loadProjectTasks = async () => {
+      if (!selectedProject) {
+        console.log('⏳ No project selected, using template data only');
+        if (isInitializing) {
+          // During initialization, end the process if no project available
+          setIsInitializing(false);
+        }
+        return;
+      }
+
+      console.log(`🔄 Loading real tasks from: ${selectedProject.customerFolder} → ${selectedProject.name}`);
+      
+      // Only show loading spinner if not during initialization (user switching projects)
+      if (!isInitializing) {
+        setIsLoadingClickupData(true);
+      }
+
+      try {
+        // Get project tasks and merge with template structure
+        const projectData = await clickupApi.getProcessedProjectData(selectedProject.id);
+        console.log('✅ Project tasks loaded successfully:', projectData);
+        
+        // Keep template structure but use real project task data
+        setClickupData(projectData);
+
+      } catch (error) {
+        console.error('❌ Failed to load project tasks:', error);
+        console.log('📋 Falling back to template data structure');
+        // Keep existing template data as fallback
       } finally {
-        setIsLoadingClickupData(false);
+        // End initialization if this was the initial load
+        if (isInitializing) {
+          console.log('🎉 Initial loading complete!');
+          setIsInitializing(false);
+        } else {
+          // End loading spinner for project switching
+          setIsLoadingClickupData(false);
+        }
       }
     };
 
-    // Load data when project is selected
-    loadClickUpData();
-  }, [selectedProject]); // Re-run when selected project changes
+    // Load project tasks when project selection changes
+    loadProjectTasks();
+  }, [selectedProject, isInitializing]); // Re-run when selected project changes
 
-  // 🚀 Load projects list on component mount and auto-select first project
+  // 🚀 Load franchise locations for dropdown
   useEffect(() => {
     const loadProjects = async () => {
-      console.log('🚀 Loading ClickUp projects list...');
+      console.log('🚀 Loading franchise location projects...');
       setIsLoadingProjects(true);
 
       try {
@@ -610,22 +659,32 @@ export default function FlowChart() {
         const projects = projectsData.projects || [];
         setProjects(projects);
         
-        // Auto-select first project if available
-        if (projects.length > 0 && !selectedProject) {
-          console.log('🎯 Auto-selecting first project:', projects[0].name);
+        // Auto-select first project if available and during initialization
+        if (projects.length > 0 && !selectedProject && isInitializing) {
+          console.log('🎯 Auto-selecting first project for initial display:', projects[0].name);
           setSelectedProject(projects[0]);
+        } else if (projects.length === 0 && isInitializing) {
+          console.log('⚠️ No projects found, ending initialization');
+          setIsInitializing(false);
         }
       } catch (error) {
         console.error('❌ Failed to load projects:', error);
         setProjects([]);
+        // End initialization if projects fail to load
+        if (isInitializing) {
+          console.log('❌ Projects failed to load, ending initialization');
+          setIsInitializing(false);
+        }
       } finally {
         setIsLoadingProjects(false);
       }
     };
 
-    // Load projects on component mount
-    loadProjects();
-  }, []); // Empty dependency array = run once on mount
+    // Load projects on component mount only
+    if (isInitializing) {
+      loadProjects();
+    }
+  }, [isInitializing, selectedProject]); // Re-run when initialization state changes
 
   // Handle project selection
   const handleProjectSelect = (project) => {
@@ -929,19 +988,19 @@ export default function FlowChart() {
               HAND
             </span>
           )}
-          {isLoadingClickupData && (
+          {(isInitializing || isLoadingClickupData) && (
             <span className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
               <RotateCcw size={12} className="animate-spin" />
               LOADING
             </span>
           )}
-          {!isLoadingClickupData && clickupData && (
+          {!isInitializing && !isLoadingClickupData && clickupData && (
             <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
               <CheckCircle size={12} />
               CLICKUP
             </span>
           )}
-          {!isLoadingClickupData && !clickupData && (
+          {!isInitializing && !isLoadingClickupData && !clickupData && (
             <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
               <XCircle size={12} />
               ERROR
@@ -1198,12 +1257,12 @@ export default function FlowChart() {
           <div className="flex-1 flex justify-center">
             <div className="text-center max-w-md">
               <h1 className="text-lg font-semibold text-gray-900">
-                {selectedProject ? selectedProject.name : 'ClickUp Flow'}
+                Franchise Project Template
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 {selectedProject ? 
-                  `Live project data • ${selectedProject.spaceName}` : 
-                  'Interactive workflow visualization'
+                  `Viewing for: ${selectedProject.customerFolder} • ${selectedProject.name}` : 
+                  'Standard franchise project workflow'
                 }
               </p>
             </div>
@@ -1222,50 +1281,75 @@ export default function FlowChart() {
               >
                 <Briefcase className="w-4 h-4 text-gray-600" />
                 <span className="text-gray-700 font-medium max-w-32 truncate">
-                  {selectedProject ? selectedProject.name : isLoadingProjects ? 'Loading...' : 'Select Project'}
+                  {selectedProject ? `${selectedProject.customerFolder} • ${selectedProject.name}` : isLoadingProjects ? 'Loading...' : 'Select Location'}
                 </span>
                 <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
                 {isLoadingProjects && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
               </button>
 
               {showProjectDropdown && (
-                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[280px] max-h-[400px] overflow-y-auto">
+                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[320px] max-h-[400px] overflow-y-auto">
                   <div className="p-2">
-                    <div className="font-semibold text-sm text-gray-800 mb-2 px-2 py-1">Select Project</div>
+                    <div className="font-semibold text-sm text-gray-800 mb-2 px-2 py-1">Franchise Locations</div>
                     
                     {/* Loading State */}
                     {isLoadingProjects && (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-blue-500 animate-spin mr-2" />
-                        <span className="text-sm text-gray-600">Loading projects...</span>
+                        <span className="text-sm text-gray-600">Loading locations...</span>
                       </div>
                     )}
 
-                    {/* Projects List */}
+                    {/* Franchise Locations by Customer */}
                     {!isLoadingProjects && projects.length > 0 && (
-                      <div className="space-y-1">
-                        {projects.map((project) => (
-                          <button
-                            key={project.id}
-                            onClick={() => handleProjectSelect(project)}
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                              selectedProject?.id === project.id 
-                                ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500' 
-                                : 'hover:bg-gray-50 text-gray-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Briefcase className="w-4 h-4" />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{project.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {project.spaceName} • {project.taskCount} tasks
-                                  {project.isTemplate && <span className="ml-1 text-blue-600">• Template</span>}
+                      <div className="space-y-2">
+                        {(() => {
+                          // Group projects by customer folder
+                          const groupedProjects = projects.reduce((groups, project) => {
+                            const customerFolder = project.customerFolder || 'Other';
+                            if (!groups[customerFolder]) {
+                              groups[customerFolder] = [];
+                            }
+                            groups[customerFolder].push(project);
+                            return groups;
+                          }, {});
+
+                          return Object.entries(groupedProjects)
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([customerFolder, locations]) => (
+                              <div key={customerFolder} className="mb-3">
+                                {/* Customer Folder Header */}
+                                <div className="px-2 py-1 text-xs font-semibold text-gray-600 uppercase tracking-wide bg-gray-50 rounded-md mb-1">
+                                  📁 {customerFolder} ({locations.length} locations)
+                                </div>
+                                
+                                {/* Locations within this customer */}
+                                <div className="space-y-1 ml-2">
+                                  {locations.map((project) => (
+                                    <button
+                                      key={project.id}
+                                      onClick={() => handleProjectSelect(project)}
+                                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                                        selectedProject?.id === project.id 
+                                          ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500' 
+                                          : 'hover:bg-gray-50 text-gray-700'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"></div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium truncate">{project.name}</div>
+                                          <div className="text-xs text-gray-500">
+                                            {project.taskCount} tasks
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
-                            </div>
-                          </button>
-                        ))}
+                            ));
+                        })()}
                       </div>
                     )}
 
@@ -1273,8 +1357,8 @@ export default function FlowChart() {
                     {!isLoadingProjects && projects.length === 0 && (
                       <div className="text-center py-4">
                         <Briefcase className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <div className="text-sm text-gray-600 mb-1">No projects found</div>
-                        <div className="text-xs text-gray-500">Check your ClickUp access</div>
+                        <div className="text-sm text-gray-600 mb-1">No franchise locations found</div>
+                        <div className="text-xs text-gray-500">Check your ClickUp Projects space</div>
                       </div>
                     )}
                   </div>
@@ -1296,7 +1380,7 @@ export default function FlowChart() {
 
             {/* System Status */}
             <div className="relative p-2 text-gray-500 rounded-lg">
-              {isLoadingClickupData ? (
+              {(isInitializing || isLoadingClickupData) ? (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
                   <span className="text-sm text-amber-600 font-medium">Loading</span>
@@ -1438,7 +1522,7 @@ export default function FlowChart() {
       )}
 
       {/* Loading State */}
-      {isLoadingClickupData && (
+      {(isInitializing || isLoadingClickupData) && (
         <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center z-[2000]">
           <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md mx-4 border border-gray-100">
             <div className="flex justify-center mb-6">
@@ -1448,9 +1532,14 @@ export default function FlowChart() {
                 <Loader2 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-500" size={24} />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">Loading ClickUp Data</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-3">
+              {isInitializing ? 'Initializing Application' : 'Loading Project Data'}
+            </h3>
             <p className="text-gray-600 leading-relaxed">
-              Fetching real project phases and tasks from ClickUp workspace...
+              {isInitializing 
+                ? 'Loading franchise locations and project data from ClickUp workspace...'
+                : 'Loading project phases and tasks from ClickUp workspace...'
+              }
             </p>
             <div className="mt-4 flex items-center justify-center gap-2 text-sm text-blue-600">
               <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
@@ -1462,7 +1551,7 @@ export default function FlowChart() {
       )}
 
       {/* Error State */}
-      {!isLoadingClickupData && !clickupData && (
+      {!isInitializing && !isLoadingClickupData && !clickupData && (
         <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center z-[2000]">
           <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-lg mx-4 border border-gray-100">
             <div className="flex justify-center mb-6">
@@ -1486,16 +1575,10 @@ export default function FlowChart() {
             <button
               onClick={async () => {
                 console.log('🔄 Retrying ClickUp data load...');
-                setIsLoadingClickupData(true);
-                try {
-                  const processedData = await clickupApi.getProcessedTemplateData();
-                  console.log('✅ ClickUp data loaded successfully on retry:', processedData);
-                  setClickupData(processedData);
-                } catch (error) {
-                  console.error('❌ Retry failed:', error);
-                } finally {
-                  setIsLoadingClickupData(false);
-                }
+                setIsInitializing(true);
+                setSelectedProject(null);
+                setProjects([]);
+                // Restart the initialization process
               }}
               className="bg-blue-500 hover:bg-blue-600 text-white border-none px-6 py-3 rounded-lg cursor-pointer text-sm font-semibold flex items-center gap-2 mx-auto transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >

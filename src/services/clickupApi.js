@@ -83,6 +83,136 @@ export const clickupApi = {
     return data;
   },
 
+  // 🏢 Projects Space Discovery - For franchise location projects
+  async findProjectsSpace(teamId = KNOWN_IDS.teamId) {
+    console.log(`🔎 Looking for Projects space in team ${teamId}...`);
+    const spacesData = await this.getSpaces(teamId);
+    
+    const projectsSpace = spacesData.spaces?.find(space => 
+      space.name.toLowerCase() === 'projects'
+    );
+    
+    if (projectsSpace) {
+      console.log(`✅ Found Projects space: ${projectsSpace.name} (${projectsSpace.id})`);
+      return projectsSpace;
+    } else {
+      console.warn('⚠️ Projects space not found');
+      return null;
+    }
+  },
+
+  async getSpaceFolders(spaceId) {
+    console.log(`📁 Fetching folders in space ${spaceId}...`);
+    const data = await apiCall(`/space/${spaceId}/folder`);
+    console.log(`📂 Found ${data.folders?.length || 0} folders:`, data.folders?.map(f => `${f.name} (${f.id})`));
+    return data;
+  },
+
+  async getFolderLists(folderId) {
+    console.log(`📄 Fetching lists in folder ${folderId}...`);
+    const data = await apiCall(`/folder/${folderId}/list`);
+    console.log(`📋 Found ${data.lists?.length || 0} lists:`, data.lists?.map(l => `${l.name} (${l.id})`));
+    return data;
+  },
+
+  async getProjectsStructure(teamId = KNOWN_IDS.teamId) {
+    console.log('🏗️ Discovering full Projects space structure...');
+    
+    try {
+      // Find Projects space
+      const projectsSpace = await this.findProjectsSpace(teamId);
+      if (!projectsSpace) {
+        throw new Error('Projects space not found');
+      }
+
+      // Get customer folders and direct lists in parallel
+      const [foldersData, directListsData] = await Promise.allSettled([
+        this.getSpaceFolders(projectsSpace.id),
+        this.getSpaceLists(projectsSpace.id)
+      ]);
+
+      const allLocationLists = [];
+
+      // Process customer folders in parallel
+      if (foldersData.status === 'fulfilled' && foldersData.value.folders) {
+        console.log(`📁 Found ${foldersData.value.folders.length} customer folders - fetching lists in parallel...`);
+        
+        // Create promises for all folder list fetches
+        const folderListPromises = foldersData.value.folders.map(folder => 
+          this.getFolderLists(folder.id)
+            .then(listsData => ({ folder, listsData, success: true }))
+            .catch(error => ({ folder, error, success: false }))
+        );
+
+        // Execute all folder list fetches in parallel
+        const folderResults = await Promise.allSettled(folderListPromises);
+
+        // Process all results
+        folderResults.forEach(result => {
+          if (result.status === 'fulfilled') {
+            const { folder, listsData, success, error } = result.value;
+            
+            if (success && listsData.lists) {
+              console.log(`✅ Processed folder: ${folder.name} (${listsData.lists.length} lists)`);
+              
+              listsData.lists.forEach(list => {
+                allLocationLists.push({
+                  id: list.id,
+                  name: list.name,
+                  customerFolder: folder.name,
+                  folderId: folder.id,
+                  spaceId: projectsSpace.id,
+                  spaceName: projectsSpace.name,
+                  taskCount: list.task_count || 0,
+                  url: list.url,
+                  archived: list.archived || false
+                });
+              });
+            } else if (error) {
+              console.warn(`⚠️ Could not fetch lists for folder ${folder.name}:`, error.message);
+            }
+          }
+        });
+      }
+
+      // Process direct lists in the Projects space (no folder)
+      if (directListsData.status === 'fulfilled' && directListsData.value.lists) {
+        console.log(`📄 Found ${directListsData.value.lists.length} direct lists in Projects space`);
+        
+        directListsData.value.lists.forEach(list => {
+          allLocationLists.push({
+            id: list.id,
+            name: list.name,
+            customerFolder: 'No Folder', // Direct in space
+            folderId: null,
+            spaceId: projectsSpace.id,
+            spaceName: projectsSpace.name,
+            taskCount: list.task_count || 0,
+            url: list.url,
+            archived: list.archived || false
+          });
+        });
+      } else if (directListsData.status === 'rejected') {
+        console.warn('⚠️ Could not fetch direct lists from Projects space:', directListsData.reason?.message);
+      }
+
+      const folderCount = foldersData.status === 'fulfilled' ? foldersData.value.folders?.length || 0 : 0;
+      console.log(`✅ Optimized fetch complete! Found ${allLocationLists.length} location projects across ${folderCount} customer folders`);
+      
+      return {
+        projectsSpace,
+        customerFolders: foldersData.status === 'fulfilled' ? foldersData.value.folders || [] : [],
+        locationLists: allLocationLists.sort((a, b) => 
+          a.customerFolder.localeCompare(b.customerFolder) || a.name.localeCompare(b.name)
+        )
+      };
+      
+    } catch (error) {
+      console.error('❌ Error discovering Projects structure:', error);
+      throw error;
+    }
+  },
+
   // 📋 Template Data APIs - Core functions for current task
   async getTemplateList(listId = KNOWN_IDS.franchiseTemplateListId) {
     console.log(`📋 Fetching template list details for ${listId}...`);
@@ -310,49 +440,16 @@ export const clickupApi = {
 
   // 🚀 Project APIs - Real project data fetching
   async getUserProjects(teamId = KNOWN_IDS.teamId) {
-    console.log('🔎 Fetching user projects...');
+    console.log('🔎 Fetching franchise location projects...');
     
     try {
-      // Get all spaces for the team
-      const spacesData = await apiCall(`/team/${teamId}/space`);
-      const allProjects = [];
+      const projectsStructure = await this.getProjectsStructure(teamId);
       
-      if (spacesData.spaces) {
-        for (const space of spacesData.spaces) {
-          console.log(`📁 Checking space: ${space.name} (${space.id})`);
-          
-          try {
-            // Get all lists (projects) in this space
-            const listsData = await apiCall(`/space/${space.id}/list`);
-            
-            if (listsData.lists) {
-              for (const list of listsData.lists) {
-                // Include all non-archived lists - templates are legitimate projects too!
-                if (!list.archived && 
-                    !list.name.toLowerCase().includes('archive') &&
-                    !list.name.toLowerCase().includes('deleted')) {
-                  
-                  allProjects.push({
-                    id: list.id,
-                    name: list.name,
-                    spaceName: space.name,
-                    spaceId: space.id,
-                    taskCount: list.task_count || 0,
-                    url: list.url,
-                    archived: list.archived || false,
-                    isTemplate: list.name.toLowerCase().includes('template') || space.name.toLowerCase().includes('template')
-                  });
-                }
-              }
-            }
-          } catch (error) {
-            console.warn(`⚠️ Could not fetch lists for space ${space.name}:`, error.message);
-          }
-        }
-      }
-      
-      console.log(`✅ Found ${allProjects.length} projects across all spaces`);
-      return { projects: allProjects.sort((a, b) => a.name.localeCompare(b.name)) };
+      console.log(`✅ Found ${projectsStructure.locationLists.length} franchise locations`);
+      return { 
+        projects: projectsStructure.locationLists,
+        structure: projectsStructure
+      };
       
     } catch (error) {
       console.error('❌ Error fetching user projects:', error);

@@ -33,7 +33,7 @@ export default function FlowChart() {
   const [isLoadingClickupData, setIsLoadingClickupData] = useState(true);
   const [calendarOpacity, setCalendarOpacity] = useState(0.4);
   const [activeHeaderDropdown, setActiveHeaderDropdown] = useState(null);
-  
+
   // Project management states
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -42,7 +42,7 @@ export default function FlowChart() {
   const [isInitializing, setIsInitializing] = useState(true); // Track full initialization
   const [searchTerm, setSearchTerm] = useState(''); // Search functionality
   const [expandedFolders, setExpandedFolders] = useState(new Set()); // Track expanded folders
-  
+
   const reactFlowInstance = useReactFlow();
 
 
@@ -615,7 +615,7 @@ export default function FlowChart() {
       }
 
       console.log(`🔄 Loading real tasks from: ${selectedProject.customerFolder} → ${selectedProject.name}`);
-      
+
       // Only show loading spinner if not during initialization (user switching projects)
       if (!isInitializing) {
         setIsLoadingClickupData(true);
@@ -625,7 +625,7 @@ export default function FlowChart() {
         // Get project tasks and merge with template structure
         const projectData = await clickupApi.getProcessedProjectData(selectedProject.id);
         console.log('✅ Project tasks loaded successfully:', projectData);
-        
+
         // Keep template structure but use real project task data
         setClickupData(projectData);
 
@@ -660,7 +660,7 @@ export default function FlowChart() {
         console.log('✅ Projects loaded successfully:', projectsData);
         const projects = projectsData.projects || [];
         setProjects(projects);
-        
+
         // Auto-select first project if available and during initialization
         if (projects.length > 0 && !selectedProject && isInitializing) {
           console.log('🎯 Auto-selecting first project for initial display:', projects[0].name);
@@ -711,8 +711,8 @@ export default function FlowChart() {
   // Filter projects based on search term
   const getFilteredProjects = () => {
     if (!searchTerm.trim()) return projects;
-    
-    return projects.filter(project => 
+
+    return projects.filter(project =>
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.customerFolder?.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -1040,9 +1040,11 @@ export default function FlowChart() {
           <div className="flex items-center space-x-8">
             {/* Logo */}
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-white" />
-              </div>
+              <img
+                src="https://siliconsigns.com/wp-content/uploads/2024/02/cropped-logo_new-235x37.png"
+                alt="Silicon Signs Logo"
+                className="w-32 h-10 object-contain"
+              />
               <div className="flex flex-col">
                 <span className="text-lg font-bold text-gray-900">FlowChart</span>
                 <span className="text-xs text-gray-500 -mt-1">Project Management</span>
@@ -1284,8 +1286,8 @@ export default function FlowChart() {
                 Franchise Project Template
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                {selectedProject ? 
-                  `Viewing for: ${selectedProject.customerFolder} • ${selectedProject.name}` : 
+                {selectedProject ?
+                  `Viewing for: ${selectedProject.customerFolder} • ${selectedProject.name}` :
                   'Standard franchise project workflow'
                 }
               </p>
@@ -1362,7 +1364,7 @@ export default function FlowChart() {
                             .sort(([a], [b]) => a.localeCompare(b))
                             .map(([customerFolder, locations]) => {
                               const isExpanded = expandedFolders.has(customerFolder);
-                              
+
                               return (
                                 <div key={customerFolder} className="mb-1">
                                   {/* Customer Folder Header - Clickable */}
@@ -1371,10 +1373,9 @@ export default function FlowChart() {
                                     className="w-full flex items-center justify-between px-3 py-2 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
                                   >
                                     <div className="flex items-center gap-2">
-                                      <ChevronDown 
-                                        className={`w-4 h-4 text-gray-500 transition-transform ${
-                                          isExpanded ? 'rotate-0' : '-rotate-90'
-                                        }`} 
+                                      <ChevronDown
+                                        className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'
+                                          }`}
                                       />
                                       <Folder className="w-4 h-4 text-gray-600" />
                                       <span className="text-sm font-semibold text-gray-800">
@@ -1385,7 +1386,7 @@ export default function FlowChart() {
                                       {locations.length}
                                     </span>
                                   </button>
-                                  
+
                                   {/* Locations within this customer - Collapsible */}
                                   {isExpanded && (
                                     <div className="ml-6 mt-1 space-y-1">
@@ -1393,11 +1394,10 @@ export default function FlowChart() {
                                         <button
                                           key={project.id}
                                           onClick={() => handleProjectSelect(project)}
-                                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                                            selectedProject?.id === project.id 
-                                              ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500' 
+                                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedProject?.id === project.id
+                                              ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500'
                                               : 'hover:bg-gray-50 text-gray-700'
-                                          }`}
+                                            }`}
                                         >
                                           <div className="flex items-center gap-2">
                                             <div className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"></div>
@@ -1611,7 +1611,7 @@ export default function FlowChart() {
               {isInitializing ? 'Initializing Application' : 'Loading Project Data'}
             </h3>
             <p className="text-gray-600 leading-relaxed">
-              {isInitializing 
+              {isInitializing
                 ? 'Loading franchise locations and project data from ClickUp workspace...'
                 : 'Loading project phases and tasks from ClickUp workspace...'
               }

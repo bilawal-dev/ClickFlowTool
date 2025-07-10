@@ -308,19 +308,212 @@ export const clickupApi = {
     }
   },
 
-  // 🚀 Future Project APIs - For Phase 2
-  async getUserProjects() {
+  // 🚀 Project APIs - Real project data fetching
+  async getUserProjects(teamId = KNOWN_IDS.teamId) {
     console.log('🔎 Fetching user projects...');
-    // This will be implemented in Phase 2
-    console.log('📝 Note: getUserProjects() - To be implemented in Phase 2');
-    return { projects: [] };
+    
+    try {
+      // Get all spaces for the team
+      const spacesData = await apiCall(`/team/${teamId}/space`);
+      const allProjects = [];
+      
+      if (spacesData.spaces) {
+        for (const space of spacesData.spaces) {
+          console.log(`📁 Checking space: ${space.name} (${space.id})`);
+          
+          try {
+            // Get all lists (projects) in this space
+            const listsData = await apiCall(`/space/${space.id}/list`);
+            
+            if (listsData.lists) {
+              for (const list of listsData.lists) {
+                // Include all non-archived lists - templates are legitimate projects too!
+                if (!list.archived && 
+                    !list.name.toLowerCase().includes('archive') &&
+                    !list.name.toLowerCase().includes('deleted')) {
+                  
+                  allProjects.push({
+                    id: list.id,
+                    name: list.name,
+                    spaceName: space.name,
+                    spaceId: space.id,
+                    taskCount: list.task_count || 0,
+                    url: list.url,
+                    archived: list.archived || false,
+                    isTemplate: list.name.toLowerCase().includes('template') || space.name.toLowerCase().includes('template')
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`⚠️ Could not fetch lists for space ${space.name}:`, error.message);
+          }
+        }
+      }
+      
+      console.log(`✅ Found ${allProjects.length} projects across all spaces`);
+      return { projects: allProjects.sort((a, b) => a.name.localeCompare(b.name)) };
+      
+    } catch (error) {
+      console.error('❌ Error fetching user projects:', error);
+      throw error;
+    }
   },
 
   async getProjectTasks(projectId) {
     console.log(`📋 Fetching tasks for project ${projectId}...`);
-    // This will be implemented in Phase 2
-    console.log('📝 Note: getProjectTasks() - To be implemented in Phase 2');
-    return { tasks: [] };
+    
+    try {
+      const data = await apiCall(`/list/${projectId}/task?include_closed=true&include_subtasks=true`);
+      
+      console.log(`📊 Project Tasks Summary for ${projectId}:`);
+      console.log(`  • Total tasks: ${data.tasks?.length || 0}`);
+      
+      return data;
+      
+    } catch (error) {
+      console.error(`❌ Error fetching tasks for project ${projectId}:`, error);
+      throw error;
+    }
+  },
+
+  async getProcessedProjectData(projectId) {
+    console.log(`🔄 Processing project data for project ${projectId}...`);
+    
+    try {
+      // Fetch project details and tasks
+      const [projectDetails, tasksData] = await Promise.all([
+        apiCall(`/list/${projectId}`),
+        this.getProjectTasks(projectId)
+      ]);
+
+      // Try to get custom fields for this project
+      let customFields = [];
+      try {
+        const fieldsData = await apiCall(`/list/${projectId}/field`);
+        customFields = fieldsData.fields || [];
+      } catch (error) {
+        console.warn('⚠️ Could not fetch custom fields for project, using defaults');
+      }
+
+      // Process tasks similar to template processing
+      const phaseGroups = {};
+      const allTasks = [];
+
+      if (tasksData.tasks) {
+        tasksData.tasks.forEach(task => {
+          // Try to find phase field (might have different ID than template)
+          let phaseField = task.custom_fields?.find(f => 
+            f.name?.toLowerCase().includes('phase') || 
+            f.id === KNOWN_IDS.customFields.phase
+          );
+          
+          let phaseValue = 0; // default to phase 0
+          
+          if (phaseField?.value) {
+            if (typeof phaseField.value === 'number') {
+              phaseValue = phaseField.value;
+            } else if (phaseField.value.orderindex !== undefined) {
+              phaseValue = phaseField.value.orderindex;
+            } else if (phaseField.value.id) {
+              // Try to map using known phase IDs, fallback to orderindex
+              const phaseIdToIndex = {
+                '443a83c8-d6fd-4c55-9549-97f3988de74c': 0, // DUE DILIGENCE/PLANNING
+                '1c9e2046-7658-49ee-91fa-54aa6a753df6': 1, // DESIGN
+                '2d6b7737-9726-47d4-8359-348b1d1324e6': 2, // FRANCHISE APPROVAL
+                '26c0344c-15b7-474a-a0f3-86f323c073f9': 3, // LANDLORD APPROVAL
+                '96a8714d-3989-4a40-a915-b97da07b4bc1': 4, // ESTIMATING
+                '413fe4db-e5a9-4df8-9fa1-9b76169d088c': 5, // FRANCHISEE APPROVAL
+                '792a6ff0-8583-4009-a38b-6c0b83412630': 6, // PERMITTING
+                '77a94285-7187-41ba-8861-30e13180673a': 7, // PRODUCTION
+                'cff778db-3862-4389-9caa-14a04d325edd': 8, // SHIPPING
+                '61198d4d-b6a3-4df7-b758-e32932fffa24': 9, // INSTALLATION
+                '9dac832b-7019-4b8a-b372-58239fffd30e': 10 // PROJECT CLOSE-OUT
+              };
+              phaseValue = phaseIdToIndex[phaseField.value.id] ?? phaseField.value.orderindex ?? 0;
+            }
+          }
+
+          // Try to find percent complete field
+          let percentField = task.custom_fields?.find(f => 
+            f.name?.toLowerCase().includes('complete') || 
+            f.name?.toLowerCase().includes('%') ||
+            f.id === KNOWN_IDS.customFields.percentComplete
+          );
+          
+          const percentComplete = parseInt(percentField?.value || '0');
+
+          const processedTask = {
+            id: task.id,
+            name: task.name,
+            status: task.status?.status || 'to do',
+            percentComplete,
+            phase: phaseValue,
+            phaseName: PHASE_MAPPING[phaseValue]?.name || `Phase ${phaseValue}`,
+            dependencies: [], // Will be populated if needed
+            url: task.url,
+            creator: task.creator,
+            watchers: task.watchers || [],
+            dueDate: task.due_date,
+            startDate: task.start_date
+          };
+
+          allTasks.push(processedTask);
+
+          if (!phaseGroups[phaseValue]) {
+            phaseGroups[phaseValue] = {
+              phase: phaseValue,
+              name: PHASE_MAPPING[phaseValue]?.name || `Phase ${phaseValue}`,
+              color: PHASE_MAPPING[phaseValue]?.color || '#666666',
+              emoji: PHASE_MAPPING[phaseValue]?.emoji || '📋',
+              tasks: [],
+              totalTasks: 0,
+              completedTasks: 0,
+              averageCompletion: 0
+            };
+          }
+
+          phaseGroups[phaseValue].tasks.push(processedTask);
+        });
+
+        // Calculate phase statistics
+        Object.values(phaseGroups).forEach(phase => {
+          phase.totalTasks = phase.tasks.length;
+          phase.completedTasks = phase.tasks.filter(t => t.percentComplete === 100).length;
+          const totalCompletion = phase.tasks.reduce((sum, t) => sum + t.percentComplete, 0);
+          phase.averageCompletion = Math.round(totalCompletion / phase.totalTasks);
+        });
+      }
+
+      const processedData = {
+        projectDetails,
+        phases: Object.values(phaseGroups).sort((a, b) => a.phase - b.phase),
+        allTasks,
+        customFields,
+        summary: {
+          totalPhases: Object.keys(phaseGroups).length,
+          totalTasks: allTasks.length,
+          overallCompletion: allTasks.length > 0 ? 
+            Math.round(allTasks.reduce((sum, t) => sum + t.percentComplete, 0) / allTasks.length) : 0
+        }
+      };
+
+      console.log('✅ Project Data Processing Complete:');
+      console.log(`  • Project: ${projectDetails.name}`);
+      console.log(`  • ${processedData.summary.totalPhases} phases`);
+      console.log(`  • ${processedData.summary.totalTasks} tasks`);
+      console.log(`  • ${processedData.summary.overallCompletion}% overall completion`);
+      
+      processedData.phases.forEach(phase => {
+        console.log(`  • ${phase.emoji} ${phase.name}: ${phase.totalTasks} tasks, ${phase.averageCompletion}% complete`);
+      });
+
+      return processedData;
+      
+    } catch (error) {
+      console.error('❌ Error processing project data:', error);
+      throw error;
+    }
   },
 
   // 🧪 Test Connection

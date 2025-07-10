@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReactFlow, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react';
-import { Settings, Hand, RotateCcw, CheckCircle, XCircle, FolderOpen, Folder, Save, Link, TestTube, X, MapPin, Edit, Check, ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Settings, Hand, RotateCcw, CheckCircle, XCircle, FolderOpen, Folder, Save, Link, TestTube, X, MapPin, Edit, Check, ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Loader2, AlertTriangle, RefreshCw, Layers, LayoutGrid, ChevronDown, Zap, HelpCircle, MousePointer, Move, Trash2, Square, Calendar, User, Search, Menu, Home, BarChart3, FileText, Briefcase } from 'lucide-react';
 import UniversalNode from './UniversalNode';
 import HeaderNode from './HeaderNode';
 import LegendPanel from './LegendPanel';
-import { clickupApi} from '../services/clickupApi';
+import { clickupApi } from '../services/clickupApi';
+import { Background, BackgroundVariant, Controls } from '@xyflow/react';
+import CalendarBackground from './CalenderBackground';
 
 
 // Node type mapping for ReactFlow - ALL use Universal node with full handle support
@@ -14,7 +16,7 @@ const nodeTypes = {
   milestone: UniversalNode,
   task: UniversalNode,
   levelDrop: UniversalNode,
-  header: HeaderNode  // Headers don't need handles
+  header: HeaderNode,  // Headers don't need handles
 };
 
 export default function FlowChart() {
@@ -25,12 +27,21 @@ export default function FlowChart() {
   const [nodeHandleConfigs, setNodeHandleConfigs] = useState({});
   const [nodeLabels, setNodeLabels] = useState({});
   const [editingText, setEditingText] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isHandToolActive, setIsHandToolActive] = useState(false);
   const [isOutOfBounds, setIsOutOfBounds] = useState(false);
   const [clickupData, setClickupData] = useState(null);
   const [isLoadingClickupData, setIsLoadingClickupData] = useState(true);
+  const [calendarOpacity, setCalendarOpacity] = useState(0.4);
+  const [activeHeaderDropdown, setActiveHeaderDropdown] = useState(null);
+  
+  // Project management states
+  const [projects, setProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  
   const reactFlowInstance = useReactFlow();
+
 
   // Handle keyboard events for hand tool
   useEffect(() => {
@@ -72,8 +83,8 @@ export default function FlowChart() {
     } catch (error) {
       console.error('Error loading viewport:', error);
     }
-    console.log('Using default viewport');
-    return { x: 0, y: 0, zoom: 0.75 };
+    console.log('Using default viewport - centered view');
+    return { x: 240, y: 250, zoom: 0.75 };
   };
 
   // Load saved node positions from localStorage
@@ -291,7 +302,7 @@ export default function FlowChart() {
           type: 'milestone',
           position: customDefaults[nodeId] || { x: xPosition, y: 460 },
           data: {
-            label: `${phase.emoji} Phase ${phase.phase}\n${phase.name}\n(${phase.totalTasks} tasks, ${phase.averageCompletion}%)\n(Click to expand)`,
+            label: `${phase.emoji} Phase ${phase.phase}\n${phase.name}\n(${phase.totalTasks} tasks, ${phase.averageCompletion}%)\n(Double-click to expand)`,
             phaseData: phase // Store phase data for reference
           },
           style: phaseStyle
@@ -415,24 +426,17 @@ export default function FlowChart() {
     const allNodes = [...levelHeaders, ...level1Nodes, ...level2Nodes];
 
     if (showAllTasks) {
+      // Show all tasks when "Expand Tasks" is enabled
       allNodes.push(...taskNodes);
-    } else {
-      expandedMilestones.forEach(milestoneId => {
-        let relatedTasks = [];
-
-        if (clickupData && clickupData.phases) {
-          // For ClickUp phase nodes (e.g., "phase-0", "phase-6")
-          if (milestoneId.startsWith('phase-')) {
-            const phaseNumber = parseInt(milestoneId.replace('phase-', ''));
-            relatedTasks = taskNodes.filter(task =>
-              task.data.parentPhase === phaseNumber
-            );
-          }
-        }
-        // Note: No fallback handling since we removed hardcoded nodes
-
-        allNodes.push(...relatedTasks);
+    } else if (expandedMilestones.size > 0) {
+      // Show only tasks for expanded milestones
+      const expandedTaskNodes = taskNodes.filter(taskNode => {
+        // Check if this task belongs to an expanded milestone
+        const parentPhase = taskNode.data.parentPhase;
+        const parentPhaseId = `phase-${parentPhase}`;
+        return expandedMilestones.has(parentPhaseId);
       });
+      allNodes.push(...expandedTaskNodes);
     }
     return allNodes;
   };
@@ -448,23 +452,20 @@ export default function FlowChart() {
     const baseEdges = [...level1Edges, ...levelDropEdges, ...level2Edges];
 
     if (showAllTasks) {
+      // Show all task edges when "Expand Tasks" is enabled
       baseEdges.push(...taskEdges);
-    } else {
-      expandedMilestones.forEach(milestoneId => {
-        let relatedEdges = [];
-
-        if (clickupData && clickupData.phases) {
-          // For ClickUp phase nodes (e.g., "phase-0", "phase-6")
-          if (milestoneId.startsWith('phase-')) {
-            relatedEdges = taskEdges.filter(edge =>
-              edge.source === milestoneId
-            );
-          }
+    } else if (expandedMilestones.size > 0) {
+      // Show only task edges for expanded milestones
+      const expandedTaskEdges = taskEdges.filter(edge => {
+        // Check if this edge connects to an expanded milestone
+        const sourcePhaseMatch = edge.source.match(/^phase-(\d+)$/);
+        if (sourcePhaseMatch) {
+          const phaseId = edge.source;
+          return expandedMilestones.has(phaseId);
         }
-        // Note: No fallback handling since we removed hardcoded edges
-
-        baseEdges.push(...relatedEdges);
+        return false;
       });
+      baseEdges.push(...expandedTaskEdges);
     }
 
     // Apply modifications to base edges
@@ -572,12 +573,17 @@ export default function FlowChart() {
   // 🔄 Load ClickUp data on component mount
   useEffect(() => {
     const loadClickUpData = async () => {
-      console.log('🔄 Loading ClickUp data for flowchart...');
+      if (!selectedProject) {
+        console.log('⏳ No project selected yet, waiting for projects to load...');
+        return;
+      }
+
+      console.log(`🔄 Loading project data for: ${selectedProject.name}`);
       setIsLoadingClickupData(true);
 
       try {
-        const processedData = await clickupApi.getProcessedTemplateData();
-        console.log('✅ ClickUp data loaded successfully:', processedData);
+        const processedData = await clickupApi.getProcessedProjectData(selectedProject.id);
+        console.log('✅ Project data loaded successfully:', processedData);
         setClickupData(processedData);
 
       } catch (error) {
@@ -588,11 +594,46 @@ export default function FlowChart() {
       }
     };
 
-    // Load data on component mount
+    // Load data when project is selected
     loadClickUpData();
+  }, [selectedProject]); // Re-run when selected project changes
+
+  // 🚀 Load projects list on component mount and auto-select first project
+  useEffect(() => {
+    const loadProjects = async () => {
+      console.log('🚀 Loading ClickUp projects list...');
+      setIsLoadingProjects(true);
+
+      try {
+        const projectsData = await clickupApi.getUserProjects();
+        console.log('✅ Projects loaded successfully:', projectsData);
+        const projects = projectsData.projects || [];
+        setProjects(projects);
+        
+        // Auto-select first project if available
+        if (projects.length > 0 && !selectedProject) {
+          console.log('🎯 Auto-selecting first project:', projects[0].name);
+          setSelectedProject(projects[0]);
+        }
+      } catch (error) {
+        console.error('❌ Failed to load projects:', error);
+        setProjects([]);
+      } finally {
+        setIsLoadingProjects(false);
+      }
+    };
+
+    // Load projects on component mount
+    loadProjects();
   }, []); // Empty dependency array = run once on mount
 
-
+  // Handle project selection
+  const handleProjectSelect = (project) => {
+    console.log('🎯 Project selected:', project.name);
+    setSelectedProject(project);
+    setShowProjectDropdown(false);
+    setActiveHeaderDropdown(null);
+  };
 
   // Delete invalid connections when handles are disabled
   const cleanupInvalidConnections = useCallback(() => {
@@ -650,15 +691,24 @@ export default function FlowChart() {
     }
   }, [onNodesChange, reactFlowInstance, saveNodePositions]);
 
-  const handleNodeClick = (event, node) => {
-    if (node.style && node.style.cursor === 'pointer') {
+  const handleNodeDoubleClick = (event, node) => {
+    console.log('🖱️ Node double-clicked:', node.id, 'Type:', node.type, 'Style:', node.style);
+
+    // Check if it's a phase node (milestone type) or has cursor pointer
+    if (node.type === 'milestone' || (node.style && node.style.cursor === 'pointer')) {
+      console.log('✅ Expanding/collapsing milestone:', node.id);
       const newExpanded = new Set(expandedMilestones);
       if (newExpanded.has(node.id)) {
+        console.log('🔽 Collapsing milestone:', node.id);
         newExpanded.delete(node.id);
       } else {
+        console.log('🔼 Expanding milestone:', node.id);
         newExpanded.add(node.id);
       }
       setExpandedMilestones(newExpanded);
+      console.log('📊 Updated expanded milestones:', Array.from(newExpanded));
+    } else {
+      console.log('❌ Node not expandable:', node.id, 'Type:', node.type);
     }
   };
 
@@ -718,17 +768,15 @@ export default function FlowChart() {
 
 
 
-  // Reset node positions to defaults (either custom saved defaults or original hardcoded)
-  const resetNodePositions = () => {
-    localStorage.removeItem('flowchart-node-positions');
-    console.log('Reset node positions to defaults');
-    setNodes(getVisibleNodes());
-  };
+  // Reset node positions (functionality moved to header dropdown)
 
   // Reset to overview
   const resetView = () => {
-    const newViewport = { x: 0, y: 0, zoom: 0.75 };
+    const newViewport = { x: 240, y: 250, zoom: 0.75 };
+
     if (reactFlowInstance) {
+      // reactFlowInstance.fitView({ padding: 0.1, maxZoom: 0.75 })
+
       reactFlowInstance.setViewport(newViewport);
       saveViewport(newViewport);
     }
@@ -739,16 +787,16 @@ export default function FlowChart() {
     let newViewport;
     switch (level) {
       case 1:
-        newViewport = { x: -50, y: -50, zoom: 1.0 };
+        newViewport = { x: 240, y: 350, zoom: 1.0 };
         break;
       case 2:
-        newViewport = { x: -50, y: -350, zoom: 1.0 };
+        newViewport = { x: 240, y: -150, zoom: 1.0 };
         break;
       case 3:
-        newViewport = { x: -50, y: -650, zoom: 1.0 };
+        newViewport = { x: 240, y: -250, zoom: 1.0 };
         break;
       default:
-        newViewport = { x: 0, y: 0, zoom: 0.75 };
+        newViewport = { x: 240, y: 250, zoom: 0.75 };
     }
     if (reactFlowInstance) {
       reactFlowInstance.setViewport(newViewport);
@@ -778,9 +826,9 @@ export default function FlowChart() {
     setContextMenu(null);
   };
 
-  // Close dropdown
+  // Close dropdown (removed - functionality moved to header)
   const closeDropdown = () => {
-    setShowDropdown(false);
+    // No-op - functionality moved to header dropdowns
   };
 
   // Toggle handle for a node
@@ -808,11 +856,6 @@ export default function FlowChart() {
     saveNodeLabels(newLabels);
   };
 
-  // Start editing text for a node
-  const startEditingText = (nodeId, currentText) => {
-    setEditingText(currentText);
-  };
-
   // Save edited text
   const saveEditedText = (nodeId) => {
     if (editingText.trim()) {
@@ -821,12 +864,6 @@ export default function FlowChart() {
     setEditingText('');
     closeContextMenu();
   };
-
-  // Modify existing connection handles
-  const modifyConnectionHandles = useCallback((edgeId, newSourceHandle, newTargetHandle) => {
-    saveConnectionMod(edgeId, { sourceHandle: newSourceHandle, targetHandle: newTargetHandle });
-    setEdges(getVisibleEdges());
-  }, [saveConnectionMod, setEdges]);
 
   // Handle new connections when user drags between handles
   const onConnect = useCallback((connection) => {
@@ -876,13 +913,16 @@ export default function FlowChart() {
     });
   }, [nodes, setEdges]);
 
+
+
+
   return (
     <>
-      {/* Clean Control Panel - Matching Legend Style */}
-      <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-lg shadow-md border border-gray-200 text-sm max-w-[430px]">
-        <div className="font-medium text-gray-700 mb-3 text-sm flex items-center gap-1.5">
+      {/* Status Indicators - Top Left */}
+      <div className="fixed left-4 z-30 bg-white rounded-lg shadow-md border border-gray-200 text-sm" style={{ top: '84px' }}>
+        <div className="font-medium text-gray-700 text-sm flex items-center gap-1.5 p-3">
           <Settings size={16} className="text-blue-600" />
-          <span>Controls</span>
+          <span>Status</span>
           {isHandToolActive && (
             <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
               <Hand size={12} />
@@ -908,133 +948,392 @@ export default function FlowChart() {
             </span>
           )}
         </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          <button
-            onClick={toggleAllTasks}
-            className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
-          >
-            {showAllTasks ? <FolderOpen size={14} /> : <Folder size={14} />}
-            <span>{showAllTasks ? 'Collapse' : 'Expand'}</span>
-          </button>
-
-          <button
-            onClick={saveCurrentLayoutAsDefault}
-            className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
-          >
-            <Save size={14} />
-            <span>Save Layout</span>
-          </button>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
-            >
-              <RotateCcw size={14} />
-              <span>Reset</span>
-              <span className={`text-xs transition-transform duration-150 ease-in-out ${showDropdown ? 'rotate-180' : 'rotate-0'}`}>▼</span>
-            </button>
-
-            {showDropdown && (
-              <div className="absolute top-[42px] left-0 bg-white border border-gray-200 rounded-md shadow-lg z-[1000] min-w-[140px] p-1">
-                <button
-                  onClick={() => { resetView(); setShowDropdown(false); }}
-                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
-                >
-                  <RotateCcw size={12} />
-                  <span>Reset View</span>
-                </button>
-                <button
-                  onClick={() => { resetNodePositions(); setShowDropdown(false); }}
-                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
-                >
-                  <MapPin size={12} />
-                  <span>Reset Positions</span>
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('flowchart-handle-configs');
-                    setNodeHandleConfigs({});
-                    setShowDropdown(false);
-                  }}
-                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
-                >
-                  <Link size={12} />
-                  <span>Reset Handles</span>
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('flowchart-custom-connections');
-                    localStorage.removeItem('flowchart-connection-mods');
-                    setEdges(getVisibleEdges());
-                    setShowDropdown(false);
-                  }}
-                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
-                >
-                  <Link size={12} />
-                  <span>Reset Connections</span>
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('flowchart-node-labels');
-                    setNodeLabels({});
-                    setShowDropdown(false);
-                  }}
-                  className="w-full bg-transparent border-none px-3 py-2 text-left cursor-pointer rounded text-xs text-gray-700 flex items-center gap-1.5 transition-colors duration-150 ease-in-out hover:bg-gray-100"
-                >
-                  <RotateCcw size={12} />
-                  <span>Reset Text</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          <select
-            onChange={(e) => {
-              const level = parseInt(e.target.value);
-              if (level === 0) resetView();
-              else focusLevel(level);
-              e.target.value = "0";
-            }}
-            className="bg-white border border-gray-300 px-3 py-2 pr-8 rounded-md cursor-pointer text-xs text-gray-700 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M6%209L2%205h8z%22/%3E%3C/svg%3E')] bg-no-repeat bg-[right_8px_center]"
-          >
-            <option value="0">📍 Navigate</option>
-            <option value="1">📍 CRM</option>
-            <option value="2">📍 Milestones</option>
-            <option value="3">📍 Tasks</option>
-          </select>
-
-          <button
-            onClick={() => setShowHandles(!showHandles)}
-            className={`${showHandles ? 'bg-gray-100' : 'bg-white'} border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm`}
-          >
-            <Link size={14} />
-            <span>{showHandles ? 'Hide Handles' : 'Show Handles'}</span>
-          </button>
-
-          <button
-            onClick={async () => {
-              console.log('🔄 Manual API test triggered...');
-              try {
-                const processedData = await clickupApi.getProcessedTemplateData();
-                console.log('📊 Processed Data:', processedData);
-                alert(`✅ API Test Complete! Found ${processedData.summary.totalTasks} tasks across ${processedData.summary.totalPhases} phases. Check console for details.`);
-              } catch (error) {
-                console.error('❌ Manual API test failed:', error);
-                alert(`❌ API Test Failed: ${error.message}`);
-              }
-            }}
-            className="bg-white border border-gray-300 px-3 py-2 rounded-md cursor-pointer text-xs text-gray-700 flex items-center gap-1.5 font-medium transition-all duration-200 ease-in-out shadow-sm hover:border-gray-400 hover:shadow-md active:translate-y-px active:shadow-sm"
-          >
-            <TestTube size={14} />
-            <span>Test ClickUp API</span>
-          </button>
-        </div>
       </div>
 
-      {/* Clean Legend Panel - Top Right */}
-      <LegendPanel />
+      {/* Professional Website Header */}
+      <header className="fixed top-0 left-0 w-full bg-white z-20 border-b border-gray-200 shadow-sm" style={{ height: '72px' }}>
+        <div className="flex items-center justify-between h-full px-6">
+          {/* Left Section - Logo & Navigation */}
+          <div className="flex items-center space-x-8">
+            {/* Logo */}
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg font-bold text-gray-900">FlowChart</span>
+                <span className="text-xs text-gray-500 -mt-1">Project Management</span>
+              </div>
+            </div>
+
+            {/* Header Dropdowns */}
+            <nav className="hidden md:flex items-center space-x-6">
+              {/* Legend Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveHeaderDropdown(activeHeaderDropdown === 'legend' ? null : 'legend')}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span className="text-sm font-medium">Legend</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform ${activeHeaderDropdown === 'legend' ? 'rotate-180' : ''}`} />
+                </button>
+
+                {activeHeaderDropdown === 'legend' && (
+                  <div className="absolute top-8 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 min-w-[280px]">
+                    <div className="space-y-4">
+                      <div className="font-semibold text-sm text-gray-800 mb-3">Node Types</div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-blue-100 border-2 border-blue-600 rounded"></div>
+                          <span className="text-sm text-gray-700">Automation Steps</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-orange-100 border-2 border-orange-600 rounded border-dashed"></div>
+                          <span className="text-sm text-gray-700">Decision Points</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-green-100 border-2 border-green-600 rounded-lg"></div>
+                          <span className="text-sm text-gray-700">Milestones (Double-click to expand)</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-purple-100 border-2 border-purple-600 rounded-sm"></div>
+                          <span className="text-sm text-gray-700">Individual Tasks</span>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <div className="font-semibold text-sm text-gray-800 mb-2">Status Colors</div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 bg-green-500 rounded"></div>
+                            <span className="text-sm text-gray-700">Completed (100%)</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                            <span className="text-sm text-gray-700">In Progress</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 bg-purple-500 rounded"></div>
+                            <span className="text-sm text-gray-700">Not Started</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Controls Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveHeaderDropdown(activeHeaderDropdown === 'controls' ? null : 'controls')}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm font-medium">Controls</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform ${activeHeaderDropdown === 'controls' ? 'rotate-180' : ''}`} />
+                </button>
+
+                {activeHeaderDropdown === 'controls' && (
+                  <div className="absolute top-8 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 min-w-[320px]">
+                    <div className="space-y-4">
+                      <div className="font-semibold text-sm text-gray-800 mb-3">View Controls</div>
+
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => { toggleAllTasks(); setActiveHeaderDropdown(null); }}
+                          className="w-full flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            {showAllTasks ? <FolderOpen size={16} /> : <Folder size={16} />}
+                            <span className="text-sm font-medium">{showAllTasks ? 'Collapse Tasks' : 'Expand Tasks'}</span>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => { setShowHandles(!showHandles); setActiveHeaderDropdown(null); }}
+                          className="w-full flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Link size={16} />
+                            <span className="text-sm font-medium">{showHandles ? 'Hide Handles' : 'Show Handles'}</span>
+                          </div>
+                        </button>
+
+                        <div className="p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calendar size={16} />
+                            <span className="text-sm font-medium">Calendar Opacity</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={calendarOpacity}
+                            onChange={(e) => setCalendarOpacity(parseFloat(e.target.value))}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <div className="text-xs text-gray-500 text-center mt-1">{Math.round(calendarOpacity * 100)}%</div>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <div className="font-semibold text-sm text-gray-800 mb-2">Navigation</div>
+                        <select
+                          onChange={(e) => {
+                            const level = parseInt(e.target.value);
+                            if (level === 0) resetView();
+                            else focusLevel(level);
+                            setActiveHeaderDropdown(null);
+                            e.target.value = "0";
+                          }}
+                          className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                        >
+                          <option value="0">📍 Jump to Level</option>
+                          <option value="1">📍 CRM Logic</option>
+                          <option value="2">📍 Project Phases</option>
+                          <option value="3">📍 Task Details</option>
+                        </select>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <div className="font-semibold text-sm text-gray-800 mb-2">Actions</div>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => { saveCurrentLayoutAsDefault(); setActiveHeaderDropdown(null); }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors"
+                          >
+                            <Save size={14} />
+                            <span className="text-sm">Save Layout</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              console.log('🔄 Manual API test triggered...');
+                              try {
+                                const processedData = await clickupApi.getProcessedTemplateData();
+                                console.log('📊 Processed Data:', processedData);
+                                alert(`✅ API Test Complete! Found ${processedData.summary.totalTasks} tasks across ${processedData.summary.totalPhases} phases. Check console for details.`);
+                              } catch (error) {
+                                console.error('❌ Manual API test failed:', error);
+                                alert(`❌ API Test Failed: ${error.message}`);
+                              }
+                              setActiveHeaderDropdown(null);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors"
+                          >
+                            <TestTube size={14} />
+                            <span className="text-sm">Test ClickUp API</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <div className="font-semibold text-sm text-gray-800 mb-2">Reset Options</div>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => { resetView(); setActiveHeaderDropdown(null); }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
+                          >
+                            <RotateCcw size={14} />
+                            <span className="text-sm">Reset View</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('flowchart-node-positions');
+                              setNodes(getVisibleNodes());
+                              setActiveHeaderDropdown(null);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
+                          >
+                            <MapPin size={14} />
+                            <span className="text-sm">Reset Positions</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('flowchart-handle-configs');
+                              setNodeHandleConfigs({});
+                              setActiveHeaderDropdown(null);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
+                          >
+                            <Link size={14} />
+                            <span className="text-sm">Reset Handles</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('flowchart-custom-connections');
+                              localStorage.removeItem('flowchart-connection-mods');
+                              setEdges(getVisibleEdges());
+                              setActiveHeaderDropdown(null);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
+                          >
+                            <Link size={14} />
+                            <span className="text-sm">Reset Connections</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('flowchart-node-labels');
+                              setNodeLabels({});
+                              setActiveHeaderDropdown(null);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
+                          >
+                            <RotateCcw size={14} />
+                            <span className="text-sm">Reset Text</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </nav>
+          </div>
+
+          {/* Center Section - Project Title */}
+          <div className="flex-1 flex justify-center">
+            <div className="text-center max-w-md">
+              <h1 className="text-lg font-semibold text-gray-900">
+                {selectedProject ? selectedProject.name : 'ClickUp Flow'}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedProject ? 
+                  `Live project data • ${selectedProject.spaceName}` : 
+                  'Interactive workflow visualization'
+                }
+              </p>
+            </div>
+          </div>
+
+          {/* Right Section - Actions & Profile */}
+          <div className="flex items-center space-x-4">
+            {/* Project Selector */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowProjectDropdown(!showProjectDropdown);
+                  setActiveHeaderDropdown(null);
+                }}
+                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <Briefcase className="w-4 h-4 text-gray-600" />
+                <span className="text-gray-700 font-medium max-w-32 truncate">
+                  {selectedProject ? selectedProject.name : isLoadingProjects ? 'Loading...' : 'Select Project'}
+                </span>
+                <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
+                {isLoadingProjects && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
+              </button>
+
+              {showProjectDropdown && (
+                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[280px] max-h-[400px] overflow-y-auto">
+                  <div className="p-2">
+                    <div className="font-semibold text-sm text-gray-800 mb-2 px-2 py-1">Select Project</div>
+                    
+                    {/* Loading State */}
+                    {isLoadingProjects && (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin mr-2" />
+                        <span className="text-sm text-gray-600">Loading projects...</span>
+                      </div>
+                    )}
+
+                    {/* Projects List */}
+                    {!isLoadingProjects && projects.length > 0 && (
+                      <div className="space-y-1">
+                        {projects.map((project) => (
+                          <button
+                            key={project.id}
+                            onClick={() => handleProjectSelect(project)}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                              selectedProject?.id === project.id 
+                                ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500' 
+                                : 'hover:bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Briefcase className="w-4 h-4" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{project.name}</div>
+                                <div className="text-xs text-gray-500">
+                                  {project.spaceName} • {project.taskCount} tasks
+                                  {project.isTemplate && <span className="ml-1 text-blue-600">• Template</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!isLoadingProjects && projects.length === 0 && (
+                      <div className="text-center py-4">
+                        <Briefcase className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <div className="text-sm text-gray-600 mb-1">No projects found</div>
+                        <div className="text-xs text-gray-500">Check your ClickUp access</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="hidden lg:flex items-center">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search nodes..."
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* System Status */}
+            <div className="relative p-2 text-gray-500 rounded-lg">
+              {isLoadingClickupData ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-amber-600 font-medium">Loading</span>
+                </div>
+              ) : clickupData ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-green-600 font-medium">Connected</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-sm text-red-600 font-medium">Offline</span>
+                </div>
+              )}
+            </div>
+
+            {/* User Profile */}
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-gray-600" />
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-medium text-gray-900">Admin User</p>
+                <p className="text-xs text-gray-500">Project Manager</p>
+              </div>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hidden - Legend moved to header */}
 
       {/* Clean Context Menu for Handle Configuration */}
       {contextMenu && (
@@ -1207,30 +1506,43 @@ export default function FlowChart() {
         </div>
       )}
 
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={handleNodeClick}
-        onNodeContextMenu={handleNodeContextMenu}
-        onViewportChange={handleViewportChange}
-        defaultViewport={loadSavedViewport()}
-        className={`bg-[#f8f9fa] ${isHandToolActive ? 'cursor-grab' : 'cursor-default'}`}
-        nodeTypes={nodeTypes}
-        multiSelectionKeyCode="Shift"
-        panOnDrag={isHandToolActive ? [0, 1, 2] : [1, 2]}
-        selectionOnDrag={!isHandToolActive}
-        panOnScroll
-        deleteKeyCode={["Backspace", "Delete"]}
-        onPaneClick={() => {
-          closeContextMenu();
-          closeDropdown();
-        }}
-        connectionMode="loose"
-        connectOnClick={false}
-      />
+      {/* ReactFlow Container with Calendar Background */}
+      <div className="reactflow-wrapper relative w-screen h-screen">
+        {/* Calendar Background */}
+        <CalendarBackground calendarOpacity={calendarOpacity} />
+
+        {/* ReactFlow */}
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={onConnect}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          onNodeContextMenu={handleNodeContextMenu}
+          onViewportChange={handleViewportChange}
+          defaultViewport={loadSavedViewport()}
+          className={`bg-[#f8f9fa] w-full h-full ${isHandToolActive ? 'cursor-grab' : 'cursor-default'}`}
+          nodeTypes={nodeTypes}
+          multiSelectionKeyCode="Shift"
+          panOnDrag={isHandToolActive ? [0, 1, 2] : [1, 2]}
+          selectionOnDrag={!isHandToolActive}
+          panOnScroll
+          deleteKeyCode={["Backspace", "Delete"]}
+          onPaneClick={() => {
+            closeContextMenu();
+            closeDropdown();
+            setActiveHeaderDropdown(null);
+            setShowProjectDropdown(false);
+          }}
+          connectionMode="loose"
+          connectOnClick={false}
+          style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+          <Controls />
+        </ReactFlow>
+      </div>
     </>
   );
 };

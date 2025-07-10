@@ -1,0 +1,163 @@
+{
+    "template_info": {
+      "list_id": "901314428250",
+      "list_name": "Franchise Project_Template",
+      "space_id": "90131823880",
+      "total_dependencies": 6
+    },
+    "dependencies": [
+      {
+        "dependency_id": "86a9g7wk9_86a9pe93w",
+        "depends_on": {
+          "task_id": "86a9g7wk9",
+          "task_name": "Completion Photos Received from Installation Manager",
+          "phase": "PROJECT CLOSE-OUT"
+        },
+        "dependent_task": {
+          "task_id": "86a9pe93w",
+          "task_name": "Submit Invoice Request to Accounting Team",
+          "phase": "PROJECT CLOSE-OUT"
+        },
+        "relationship_type": 1,
+        "date_created": "1750721275097",
+        "created_by_user": "120245123",
+        "workspace_id": "9013410499",
+        "chain_id": null
+      },
+      {
+        "dependency_id": "86a9g7wme_86a9pe93w",
+        "depends_on": {
+          "task_id": "86a9g7wme",
+          "task_name": "Subcontractor Invoices Processed for Payment",
+          "phase": "PROJECT CLOSE-OUT"
+        },
+        "dependent_task": {
+          "task_id": "86a9pe93w",
+          "task_name": "Submit Invoice Request to Accounting Team",
+          "phase": "PROJECT CLOSE-OUT"
+        },
+        "relationship_type": 1,
+        "date_created": "1750721265063",
+        "created_by_user": "120245123",
+        "workspace_id": "9013410499",
+        "chain_id": null
+      },
+      {
+        "dependency_id": "86a9pe74k_86a9g7w95",
+        "depends_on": {
+          "task_id": "86a9pe74k",
+          "task_name": "Update Delivery Address in Sales Order",
+          "phase": "PRODUCTION"
+        },
+        "dependent_task": {
+          "task_id": "86a9g7w95",
+          "task_name": "Unknown Task",
+          "phase": "Unknown"
+        },
+        "relationship_type": 1,
+        "date_created": "1750721206398",
+        "created_by_user": "120245123",
+        "workspace_id": "9013410499",
+        "chain_id": null
+      },
+      {
+        "dependency_id": "86a9pe6xy_86a9g7w95",
+        "depends_on": {
+          "task_id": "86a9pe6xy",
+          "task_name": "Confirm Delivery Address with Customer and/or Installer",
+          "phase": "PRODUCTION"
+        },
+        "dependent_task": {
+          "task_id": "86a9g7w95",
+          "task_name": "Unknown Task",
+          "phase": "Unknown"
+        },
+        "relationship_type": 1,
+        "date_created": "1750721056093",
+        "created_by_user": "120245123",
+        "workspace_id": "9013410499",
+        "chain_id": null
+      },
+      {
+        "dependency_id": "86a9pe40t_86a9g7vy7",
+        "depends_on": {
+          "task_id": "86a9pe40t",
+          "task_name": "Select Installation Vendor and Issue Purchase Order",
+          "phase": "DUE DILIGENCE/PLANNING"
+        },
+        "dependent_task": {
+          "task_id": "86a9g7vy7",
+          "task_name": "Unknown Task",
+          "phase": "Unknown"
+        },
+        "relationship_type": 1,
+        "date_created": "1750782794301",
+        "created_by_user": "120245123",
+        "workspace_id": "9013410499",
+        "chain_id": null
+      },
+      {
+        "dependency_id": "86a9g7wet_86a9g7wgd",
+        "depends_on": {
+          "task_id": "86a9g7wet",
+          "task_name": "Confirm Site Readiness with GC",
+          "phase": "INSTALLATION"
+        },
+        "dependent_task": {
+          "task_id": "86a9g7wgd",
+          "task_name": "Confirm Installation Schedule with Installation Manager, GC, and Customer",
+          "phase": "INSTALLATION"
+        },
+        "relationship_type": 1,
+        "date_created": "1750721239855",
+        "created_by_user": "120245123",
+        "workspace_id": "9013410499",
+        "chain_id": null
+      }
+    ],
+    "dependency_summary": {
+      "by_phase": {
+        "PROJECT CLOSE-OUT": [
+          {
+            "dependency_id": "86a9g7wk9_86a9pe93w",
+            "description": "Completion Photos Received from Installation Manager → Submit Invoice Request to Accounting Team"
+          },
+          {
+            "dependency_id": "86a9g7wme_86a9pe93w",
+            "description": "Subcontractor Invoices Processed for Payment → Submit Invoice Request to Accounting Team"
+          }
+        ],
+        "INSTALLATION": [
+          {
+            "dependency_id": "86a9g7wet_86a9g7wgd",
+            "description": "Confirm Site Readiness with GC → Confirm Installation Schedule with Installation Manager, GC, and Customer"
+          }
+        ]
+      },
+      "dependency_chains": [
+        {
+          "chain_name": "Installation Completion to Invoice Processing",
+          "tasks": [
+            "Completion Photos Received from Installation Manager",
+            "Subcontractor Invoices Processed for Payment",
+            "Submit Invoice Request to Accounting Team"
+          ]
+        },
+        {
+          "chain_name": "Site Readiness to Installation Scheduling",
+          "tasks": [
+            "Confirm Site Readiness with GC",
+            "Confirm Installation Schedule with Installation Manager, GC, and Customer"
+          ]
+        },
+        {
+          "chain_name": "Address Confirmation to Shipping Coordination",
+          "tasks": [
+            "Update Delivery Address in Sales Order",
+            "Confirm Delivery Address with Customer and/or Installer",
+            "[Shipping Coordination Task]"
+          ]
+        }
+      ]
+    }
+  }

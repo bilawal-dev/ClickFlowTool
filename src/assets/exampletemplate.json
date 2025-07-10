@@ -1,0 +1,478 @@
+{
+    "FranchiseProjectTemplate": [
+      {
+        "phase": "DUE DILIGENCE/PLANNING",
+        "tasks": [
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Review CRM-Workflow Communications",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Project Handoff Acknowledgement Email",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Survey (Technical)",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "7d",
+            "task_name": "Select Installation Vendor and Issue Purchase Order",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit PLANNING milestone update to Customer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          }
+        ]
+      },
+      {
+        "phase": "PERMITTING",
+        "tasks": [
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Request for Permit Application Submittal Sent to Installer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit PERMITTING REQUESTED update to Franchisee",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Permit Application Signed by Property Owner and/or Tenant",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Design Drawings Sealed by Licensed Engineer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Permit Package SUBMITTED to Municipality",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "Permits APPROVED by Municipality",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit PERMITTING SUBMITTED update to Franchisee",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Follow-Up with Installer or Municipality for Status of Review",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Redlines Received and Routed for Correction",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Re-Submittal Package Submitted to Municipality for Review",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "45d",
+            "task_name": "Permit Package … + 1Permits APPROVED by Municipality",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit PERMITTING APPROVED update to Franchisee",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          }
+        ]
+      },
+      {
+        "phase": "PRODUCTION",
+        "tasks": [
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Confirm Brandbook is Technically Verified",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Confirm Production Files are Completed",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Confirm Delivery Address with Customer and/or Installer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Update Delivery Address in Sales Order",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Order Lines Released to Production",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "Confirm Brandbook is Technically Verified + 3",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "30d",
+            "task_name": "Manufacturing/Ship Date Confirmed",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit PRODUCTION milestone update to Customer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          }
+        ]
+      },
+      {
+        "phase": "SHIPPING",
+        "tasks": [
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Confirm Manufacturing Completion/Ship Date with Production Manager",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Confirm Shipping Completed and Submit Tracking Information to Delivery Contact",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit SHIPPING milestone update to Customer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          }
+        ]
+      },
+      {
+        "phase": "INSTALLATION",
+        "tasks": [
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Confirm Site Readiness with GC",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Schedule Pre-Installation Inspection with Installation Manager, GC, and Electrician",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Confirm Installation Schedule with Installation Manager, GC, and Customer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "Confirm Site Readiness with GC",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Confirm Installation START",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "5d",
+            "task_name": "Confirm Installation COMPLETE",
+            "assignee": "",
+            "start_date": "Sep 15",
+            "due_date": "Sep 19",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "14d",
+            "task_name": "Request Final Inspection Confirmation from Installer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Submit INSTALLATION milestone update to Customer",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          }
+        ]
+      },
+      {
+        "phase": "PROJECT CLOSE-OUT",
+        "tasks": [
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "7d",
+            "task_name": "Completion Photos Received from Installation Manager",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "2d",
+            "task_name": "Subcontractor Invoices Processed for Payment",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "Completion Photos Received from Installation Manager + 1",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "",
+            "task_name": "Submit Invoice Request to Accounting Team",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          },
+          {
+            "status": "TO DO",
+            "percent_complete": 0,
+            "duration": "1d",
+            "task_name": "Customer Survey",
+            "assignee": "",
+            "start_date": "",
+            "due_date": "",
+            "priority": "",
+            "dependencies": "",
+            "clickup_url": ""
+          }
+        ]
+      }
+    ]
+  }

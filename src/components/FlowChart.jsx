@@ -34,11 +34,10 @@ export default function FlowChart() {
   const [nodeHandleConfigs, setNodeHandleConfigs] = useState({});
   const [nodeLabels, setNodeLabels] = useState({});
   const [editingText, setEditingText] = useState('');
-  const [isHandToolActive, setIsHandToolActive] = useState(false);
   const [isOutOfBounds, setIsOutOfBounds] = useState(false);
   const [clickupData, setClickupData] = useState(null);
   const [isLoadingClickupData, setIsLoadingClickupData] = useState(true);
-  const [calendarOpacity, setCalendarOpacity] = useState(0.4);
+  const [calendarOpacity, setCalendarOpacity] = useState(0.5);
   const [activeHeaderDropdown, setActiveHeaderDropdown] = useState(null);
 
   // Project management states
@@ -50,78 +49,58 @@ export default function FlowChart() {
   const [searchTerm, setSearchTerm] = useState(''); // Search functionality
   const [expandedFolders, setExpandedFolders] = useState(new Set()); // Track expanded folders
 
+  // 📅 Timeline header positioning - track ReactFlow viewport
+  const [currentViewport, setCurrentViewport] = useState({ x: 10, y: 250, zoom: 0.75 });
+
   const reactFlowInstance = useReactFlow();
 
-
-  // Handle keyboard events for hand tool
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      // Only activate if not editing text and H key is pressed
-      if (event.key.toLowerCase() === 'h' && !contextMenu && document.activeElement.tagName !== 'INPUT') {
-        event.preventDefault();
-        setIsHandToolActive(true);
-      }
-    };
-
-    const handleKeyUp = (event) => {
-      if (event.key.toLowerCase() === 'h') {
-        event.preventDefault();
-        setIsHandToolActive(false);
-      }
-    };
-
-    // Add event listeners
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [contextMenu]);
+  // Generate project-specific localStorage keys
+  const getStorageKey = useCallback((baseKey) => {
+    if (selectedProject) {
+      return `${baseKey}-project-${selectedProject.id}`;
+    }
+    return baseKey; // Use global key for template mode
+  }, [selectedProject]);
 
   // Load saved viewport from localStorage
   const loadSavedViewport = () => {
     try {
-      const saved = localStorage.getItem('flowchart-viewport');
+      const key = getStorageKey('flowchart-viewport');
+      const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // console.log('Loading saved viewport:', parsed);
         return parsed;
       }
     } catch (error) {
       console.error('Error loading viewport:', error);
     }
-    // console.log('Using default viewport - centered view');
     return { x: 10, y: 250, zoom: 0.75 };
   };
 
   // Load saved node positions from localStorage
   const loadSavedNodePositions = () => {
     try {
-      const saved = localStorage.getItem('flowchart-node-positions');
+      const key = getStorageKey('flowchart-node-positions');
+      const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // console.log('Loading saved node positions:', Object.keys(parsed).length, 'nodes');
         return parsed;
       }
     } catch (error) {
       console.error('Error loading node positions:', error);
     }
-    // console.log('Using default node positions');
     return {};
   };
 
   // Save viewport to localStorage
   const saveViewport = useCallback((viewport) => {
     try {
-      // console.log('Saving viewport:', viewport);
-      localStorage.setItem('flowchart-viewport', JSON.stringify(viewport));
+      const key = getStorageKey('flowchart-viewport');
+      localStorage.setItem(key, JSON.stringify(viewport));
     } catch (error) {
       console.error('Error saving viewport:', error);
     }
-  }, []);
+  }, [getStorageKey]);
 
   // Save node positions to localStorage
   const saveNodePositions = useCallback((nodes) => {
@@ -130,40 +109,39 @@ export default function FlowChart() {
       nodes.forEach(node => {
         positions[node.id] = node.position;
       });
-      // console.log('Saving node positions:', Object.keys(positions).length, 'nodes');
-      localStorage.setItem('flowchart-node-positions', JSON.stringify(positions));
+      const key = getStorageKey('flowchart-node-positions');
+      localStorage.setItem(key, JSON.stringify(positions));
     } catch (error) {
       console.error('Error saving node positions:', error);
     }
-  }, []);
+  }, [getStorageKey]);
 
   // Load saved handle configurations from localStorage
   const loadSavedHandleConfigs = () => {
     try {
-      const saved = localStorage.getItem('flowchart-handle-configs');
+      const key = getStorageKey('flowchart-handle-configs');
+      const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // console.log('Loading saved handle configs:', Object.keys(parsed).length, 'nodes');
         setNodeHandleConfigs(parsed);
         return parsed;
       }
     } catch (error) {
       console.error('Error loading handle configs:', error);
     }
-    // console.log('Using default handle configs');
     return {};
   };
 
   // Save handle configurations to localStorage
   const saveHandleConfigs = useCallback((configs) => {
     try {
-      // console.log('Saving handle configs:', Object.keys(configs).length, 'nodes');
-      localStorage.setItem('flowchart-handle-configs', JSON.stringify(configs));
+      const key = getStorageKey('flowchart-handle-configs');
+      localStorage.setItem(key, JSON.stringify(configs));
       setNodeHandleConfigs(configs);
     } catch (error) {
       console.error('Error saving handle configs:', error);
     }
-  }, []);
+  }, [getStorageKey]);
 
   // Clean, simple node styles
   const nodeStyles = {
@@ -353,7 +331,6 @@ export default function FlowChart() {
         break;
     }
 
-    console.log(`📅 Generated ${columns.length} ${timelineType} timeline columns`);
     return columns;
   };
 
@@ -395,7 +372,6 @@ export default function FlowChart() {
     // LEVEL 2: Generate phase nodes with timeline-based positioning
     let level2Nodes = [];
     if (clickupData && clickupData.phases) {
-      console.log('🎯 Generating timeline-based phase nodes:', clickupData.phases.length, 'phases');
 
       level2Nodes = clickupData.phases.map((phase, index) => {
         const nodeId = `phase-${phase.phase}`;
@@ -409,7 +385,6 @@ export default function FlowChart() {
           // Calculate timeline-based position
           const phasePos = calculatePhasePosition(phase, timelineColumns);
           position = { x: phasePos.x, y: 460 };
-          console.log(`📍 Phase ${phase.phase} positioned at timeline x: ${phasePos.x}`);
         } else {
           // Fallback to default spacing
           position = { x: 150 + (index * 300), y: 460 };
@@ -448,7 +423,6 @@ export default function FlowChart() {
     // LEVEL 3: Generate task nodes with timeline-based positioning
     let taskNodes = [];
     if (clickupData && clickupData.phases) {
-      console.log('📋 Generating timeline-based task nodes');
 
       // Group all tasks by their timeline columns for proper stacking
       const allTasks = clickupData.phases.flatMap(phase => phase.tasks);
@@ -481,7 +455,6 @@ export default function FlowChart() {
             // Calculate timeline-based position
             const taskPos = calculateTaskPosition(task, timelineColumns, taskIndexInColumn);
             position = taskPos;
-            console.log(`📍 Task "${task.name}" positioned at timeline x: ${taskPos.x}, y: ${taskPos.y}`);
           } else {
             // Fallback to default positioning
             const baseX = 120 + (phase.phase * 230);
@@ -621,7 +594,8 @@ export default function FlowChart() {
 
   const getVisibleEdges = () => {
     // Load saved connection modifications
-    const savedConnectionMods = JSON.parse(localStorage.getItem('flowchart-connection-mods') || '{}');
+    const connectionModsKey = getStorageKey('flowchart-connection-mods');
+    const savedConnectionMods = JSON.parse(localStorage.getItem(connectionModsKey) || '{}');
 
     // Get dynamic edges based on ClickUp data
     const { levelDropEdges, level2Edges, taskEdges } = getDynamicEdges();
@@ -657,7 +631,8 @@ export default function FlowChart() {
 
     // Load saved custom connections
     try {
-      const savedConnections = localStorage.getItem('flowchart-custom-connections');
+      const customConnectionsKey = getStorageKey('flowchart-custom-connections');
+      const savedConnections = localStorage.getItem(customConnectionsKey);
       if (savedConnections) {
         const customConnections = JSON.parse(savedConnections);
         modifiedEdges.push(...customConnections);
@@ -674,10 +649,11 @@ export default function FlowChart() {
 
   // Save connection modifications to localStorage
   const saveConnectionMod = useCallback((edgeId, modification) => {
-    const savedMods = JSON.parse(localStorage.getItem('flowchart-connection-mods') || '{}');
+    const key = getStorageKey('flowchart-connection-mods');
+    const savedMods = JSON.parse(localStorage.getItem(key) || '{}');
     savedMods[edgeId] = modification;
-    localStorage.setItem('flowchart-connection-mods', JSON.stringify(savedMods));
-  }, []);
+    localStorage.setItem(key, JSON.stringify(savedMods));
+  }, [getStorageKey]);
 
   // Delete existing connection
   const deleteConnection = useCallback((edgeId) => {
@@ -696,27 +672,30 @@ export default function FlowChart() {
         const edgeId = change.id;
         if (edgeId.startsWith('custom-')) {
           // Remove from custom connections
-          const savedConnections = JSON.parse(localStorage.getItem('flowchart-custom-connections') || '[]');
+          const customConnectionsKey = getStorageKey('flowchart-custom-connections');
+          const savedConnections = JSON.parse(localStorage.getItem(customConnectionsKey) || '[]');
           const updatedConnections = savedConnections.filter(edge => edge.id !== edgeId);
-          localStorage.setItem('flowchart-custom-connections', JSON.stringify(updatedConnections));
+          localStorage.setItem(customConnectionsKey, JSON.stringify(updatedConnections));
         } else {
           // Mark pre-existing connection as deleted
           deleteConnection(edgeId);
         }
       });
     }
-  }, [onEdgesChange, deleteConnection]);
+  }, [onEdgesChange, deleteConnection, getStorageKey]);
 
-  // Load saved viewport on component mount
+  // Load saved viewport on component mount and when project changes
   useEffect(() => {
     const savedViewport = loadSavedViewport();
+    // 📅 Update current viewport state for timeline header sync
+    setCurrentViewport(savedViewport);
+    
     if (reactFlowInstance) {
       setTimeout(() => {
-        // console.log('Setting viewport on mount:', savedViewport);
         reactFlowInstance.setViewport(savedViewport);
       }, 100); // Small delay to ensure ReactFlow is ready
     }
-  }, [reactFlowInstance]);
+  }, [reactFlowInstance, selectedProject]); // Re-run when project changes too
 
   // Load saved handle configurations on component mount
   useEffect(() => {
@@ -726,12 +705,14 @@ export default function FlowChart() {
   // Save and load node labels
   const saveNodeLabels = (labels) => {
     setNodeLabels(labels);
-    localStorage.setItem('flowchart-node-labels', JSON.stringify(labels));
+    const key = getStorageKey('flowchart-node-labels');
+    localStorage.setItem(key, JSON.stringify(labels));
   };
 
   const loadSavedNodeLabels = () => {
     try {
-      const saved = localStorage.getItem('flowchart-node-labels');
+      const key = getStorageKey('flowchart-node-labels');
+      const saved = localStorage.getItem(key);
       if (saved) {
         const labels = JSON.parse(saved);
         setNodeLabels(labels);
@@ -748,20 +729,30 @@ export default function FlowChart() {
     loadSavedNodeLabels();
   }, []);
 
+  // Reload project-specific data when selectedProject changes
+  useEffect(() => {
+    // Load project-specific data when project changes
+    loadSavedHandleConfigs();
+    loadSavedNodeLabels();
+    // Note: Node positions and viewport will be loaded through the normal flow
+    // when getDefaultNodes() and loadSavedViewport() are called with the new project context
+
+    // Update nodes and edges to reflect project-specific data
+    setNodes(getVisibleNodes());
+    setEdges(getVisibleEdges());
+  }, [selectedProject]); // Re-run when selectedProject changes
+
   // 🔄 Load template data for flowchart structure (only when no project is selected)
   useEffect(() => {
     const loadTemplateData = async () => {
       if (selectedProject) {
-        console.log('⏭️ Project already selected, skipping template-only load');
         return; // Don't load template if we already have a project
       }
 
-      // console.log('🔄 Loading template structure as fallback...');
       // Don't set loading during initialization - handled by isInitializing
 
       try {
         const processedData = await clickupApi.getProcessedTemplateData();
-        // console.log('✅ Template structure loaded as fallback:', processedData);
         setClickupData(processedData);
 
       } catch (error) {
@@ -781,7 +772,6 @@ export default function FlowChart() {
   useEffect(() => {
     const loadProjectTasks = async () => {
       if (!selectedProject) {
-        // console.log('⏳ No project selected, using template data only');
         if (isInitializing) {
           // During initialization, end the process if no project available
           setIsInitializing(false);
@@ -789,7 +779,6 @@ export default function FlowChart() {
         return;
       }
 
-      // console.log(`🔄 Loading real tasks from: ${selectedProject.customerFolder} → ${selectedProject.name}`);
 
       // Only show loading spinner if not during initialization (user switching projects)
       if (!isInitializing) {
@@ -799,19 +788,16 @@ export default function FlowChart() {
       try {
         // Get project tasks and merge with template structure
         const projectData = await clickupApi.getProcessedProjectData(selectedProject.id);
-        // console.log('✅ Project tasks loaded successfully:', projectData);
 
         // Keep template structure but use real project task data
         setClickupData(projectData);
 
       } catch (error) {
         console.error('❌ Failed to load project tasks:', error);
-        // console.log('📋 Falling back to template data structure');
         // Keep existing template data as fallback
       } finally {
         // End initialization if this was the initial load
         if (isInitializing) {
-          // console.log('🎉 Initial loading complete!');
           setIsInitializing(false);
         } else {
           // End loading spinner for project switching
@@ -827,21 +813,17 @@ export default function FlowChart() {
   // 🚀 Load franchise locations for dropdown
   useEffect(() => {
     const loadProjects = async () => {
-      // console.log('🚀 Loading franchise location projects...');
       setIsLoadingProjects(true);
 
       try {
         const projectsData = await clickupApi.getUserProjects();
-        // console.log('✅ Projects loaded successfully:', projectsData);
         const projects = projectsData.projects || [];
         setProjects(projects);
 
         // Auto-select first project if available and during initialization
         if (projects.length > 0 && !selectedProject && isInitializing) {
-          // console.log('🎯 Auto-selecting first project for initial display:', projects[0].name);
           setSelectedProject(projects[0]);
         } else if (projects.length === 0 && isInitializing) {
-          // console.log('⚠️ No projects found, ending initialization');
           setIsInitializing(false);
         }
       } catch (error) {
@@ -849,7 +831,6 @@ export default function FlowChart() {
         setProjects([]);
         // End initialization if projects fail to load
         if (isInitializing) {
-          // console.log('❌ Projects failed to load, ending initialization');
           setIsInitializing(false);
         }
       } finally {
@@ -865,7 +846,6 @@ export default function FlowChart() {
 
   // Handle project selection
   const handleProjectSelect = (project) => {
-    // console.log('🎯 Project selected:', project.name);
     setSelectedProject(project);
     setShowProjectDropdown(false);
     setActiveHeaderDropdown(null);
@@ -950,23 +930,17 @@ export default function FlowChart() {
   }, [onNodesChange, reactFlowInstance, saveNodePositions]);
 
   const handleNodeDoubleClick = (event, node) => {
-    console.log('🖱️ Node double-clicked:', node.id, 'Type:', node.type, 'Style:', node.style);
 
     // Check if it's a phase node (milestone type) or has cursor pointer
     if (node.type === 'milestone' || (node.style && node.style.cursor === 'pointer')) {
-      console.log('✅ Expanding/collapsing milestone:', node.id);
       const newExpanded = new Set(expandedMilestones);
       if (newExpanded.has(node.id)) {
-        console.log('🔽 Collapsing milestone:', node.id);
         newExpanded.delete(node.id);
       } else {
-        console.log('🔼 Expanding milestone:', node.id);
         newExpanded.add(node.id);
       }
       setExpandedMilestones(newExpanded);
-      console.log('📊 Updated expanded milestones:', Array.from(newExpanded));
     } else {
-      console.log('❌ Node not expandable:', node.id, 'Type:', node.type);
     }
   };
 
@@ -978,6 +952,9 @@ export default function FlowChart() {
   // Handle viewport changes and save to localStorage
   const handleViewportChange = useCallback((viewport) => {
     saveViewport(viewport);
+    
+    // 📅 Update current viewport for timeline header synchronization
+    setCurrentViewport(viewport);
 
     // Check if user is out of main content bounds
     const contentBounds = {
@@ -1020,7 +997,6 @@ export default function FlowChart() {
 
     // Save to a special localStorage key for default positions
     localStorage.setItem('flowchart-default-positions', JSON.stringify(defaultPositions));
-    // console.log('Saved current layout as new default:', Object.keys(defaultPositions).length, 'nodes');
     alert('✅ Current layout saved as default! This will be the new reset position.');
   };
 
@@ -1037,6 +1013,8 @@ export default function FlowChart() {
 
       reactFlowInstance.setViewport(newViewport);
       saveViewport(newViewport);
+      // 📅 Update timeline header sync
+      setCurrentViewport(newViewport);
     }
   };
 
@@ -1059,6 +1037,8 @@ export default function FlowChart() {
     if (reactFlowInstance) {
       reactFlowInstance.setViewport(newViewport);
       saveViewport(newViewport);
+      // 📅 Update timeline header sync
+      setCurrentViewport(newViewport);
     }
   };
 
@@ -1139,14 +1119,12 @@ export default function FlowChart() {
     // Check if source handle is enabled
     const sourcePosition = sourceHandle?.replace('-source', '');
     if (sourcePosition && !sourceHandles[sourcePosition]) {
-      console.log(`Connection blocked: Source handle '${sourcePosition}' is disabled on node ${source}`);
       return;
     }
 
     // Check if target handle is enabled
     const targetPosition = targetHandle?.replace('-target', '');
     if (targetPosition && !targetHandles[targetPosition]) {
-      console.log(`Connection blocked: Target handle '${targetPosition}' is disabled on node ${target}`);
       return;
     }
 
@@ -1161,12 +1139,12 @@ export default function FlowChart() {
       style: { strokeWidth: 2, stroke: '#2196f3' }
     };
 
-    console.log('Creating new connection:', newEdge);
     setEdges((edges) => {
       const updatedEdges = [...edges, newEdge];
       // Save custom connections to localStorage
       const customConnections = updatedEdges.filter(edge => edge.id.startsWith('custom-'));
-      localStorage.setItem('flowchart-custom-connections', JSON.stringify(customConnections));
+      const customConnectionsKey = getStorageKey('flowchart-custom-connections');
+      localStorage.setItem(customConnectionsKey, JSON.stringify(customConnections));
       return updatedEdges;
     });
   }, [nodes, setEdges]);
@@ -1181,12 +1159,6 @@ export default function FlowChart() {
         <div className="font-medium text-gray-700 text-sm flex items-center gap-1.5 p-3">
           <Settings size={16} className="text-blue-600" />
           <span>Status</span>
-          {isHandToolActive && (
-            <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-              <Hand size={12} />
-              HAND
-            </span>
-          )}
           {(isInitializing || isLoadingClickupData) && (
             <span className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
               <RotateCcw size={12} className="animate-spin" />
@@ -1371,10 +1343,8 @@ export default function FlowChart() {
                           </button>
                           <button
                             onClick={async () => {
-                              console.log('🔄 Manual API test triggered...');
                               try {
                                 const processedData = await clickupApi.getProcessedTemplateData();
-                                console.log('📊 Processed Data:', processedData);
                                 alert(`✅ API Test Complete! Found ${processedData.summary.totalTasks} tasks across ${processedData.summary.totalPhases} phases. Check console for details.`);
                               } catch (error) {
                                 console.error('❌ Manual API test failed:', error);
@@ -1402,7 +1372,8 @@ export default function FlowChart() {
                           </button>
                           <button
                             onClick={() => {
-                              localStorage.removeItem('flowchart-node-positions');
+                              const key = getStorageKey('flowchart-node-positions');
+                              localStorage.removeItem(key);
                               setNodes(getVisibleNodes());
                               setActiveHeaderDropdown(null);
                             }}
@@ -1413,7 +1384,8 @@ export default function FlowChart() {
                           </button>
                           <button
                             onClick={() => {
-                              localStorage.removeItem('flowchart-handle-configs');
+                              const key = getStorageKey('flowchart-handle-configs');
+                              localStorage.removeItem(key);
                               setNodeHandleConfigs({});
                               setActiveHeaderDropdown(null);
                             }}
@@ -1424,8 +1396,10 @@ export default function FlowChart() {
                           </button>
                           <button
                             onClick={() => {
-                              localStorage.removeItem('flowchart-custom-connections');
-                              localStorage.removeItem('flowchart-connection-mods');
+                              const customConnectionsKey = getStorageKey('flowchart-custom-connections');
+                              const connectionModsKey = getStorageKey('flowchart-connection-mods');
+                              localStorage.removeItem(customConnectionsKey);
+                              localStorage.removeItem(connectionModsKey);
                               setEdges(getVisibleEdges());
                               setActiveHeaderDropdown(null);
                             }}
@@ -1436,7 +1410,8 @@ export default function FlowChart() {
                           </button>
                           <button
                             onClick={() => {
-                              localStorage.removeItem('flowchart-node-labels');
+                              const key = getStorageKey('flowchart-node-labels');
+                              localStorage.removeItem(key);
                               setNodeLabels({});
                               setActiveHeaderDropdown(null);
                             }}
@@ -1467,10 +1442,10 @@ export default function FlowChart() {
                 }
                 {/* 📅 Timeline status indicator */}
                 {clickupData?.timeline && (
-                  <div className="px-2 py-1 text-blue-700 rounded-md text-xs font-medium">
+                  <span className="block px-2 py-1 text-blue-700 rounded-md text-xs font-medium">
                     Timeline: <span className='capitalize'>{clickupData.timeline.timelineType}</span>
                     ({clickupData.timeline.duration} days)
-                  </div>
+                  </span>
                 )}
               </p>
             </div>
@@ -1679,16 +1654,107 @@ export default function FlowChart() {
       {/* Clean Context Menu for Handle Configuration */}
       {contextMenu && (
         <div
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-[1000] min-w-[240px]"
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-[1000] min-w-[350px] max-w-[400px] max-h-[80vh] overflow-y-auto"
           style={{
-            top: contextMenu.y,
-            left: contextMenu.x,
+            top: Math.min(contextMenu.y, window.innerHeight - 600), // Prevent going off bottom
+            left: Math.min(contextMenu.x, window.innerWidth - 420), // Prevent going off right
           }}
         >
           <div className="font-semibold mb-3 text-sm text-gray-800 flex items-center gap-2">
             <Edit size={16} className="text-blue-600" />
             <span>Edit Node</span>
           </div>
+
+          {/* Date Information Section - Compact Layout */}
+          {contextMenu.nodeId.startsWith('task-') && (
+            <div className="mb-4 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-xs text-blue-800 mb-2 font-semibold flex items-center gap-1">
+                <Calendar size={12} />
+                Timeline Info
+              </div>
+              {(() => {
+                // Find the task data from contextMenu nodeId
+                const taskId = contextMenu.nodeId.replace('task-', '');
+                const allTasks = clickupData?.phases?.flatMap(phase => phase.tasks) || [];
+                const taskData = allTasks.find(task => task.id === taskId);
+
+                if (!taskData) {
+                  return <div className="text-xs text-gray-500">No data available</div>;
+                }
+
+                return (
+                  <div className="space-y-1.5 text-xs">
+                    {/* Dates Row */}
+                    <div className="grid grid-cols-2 gap-2">
+
+                      {/* Start Date */}
+                      {taskData.startDate && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></div>
+                          <span className="text-gray-600">Start:</span>
+                          <span className="text-gray-800 font-medium text-xs">
+                            {new Date(parseInt(taskData.startDate)).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Due Date */}
+                      {taskData.dueDate && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0"></div>
+                          <span className="text-gray-600">Due:</span>
+                          <span className="text-gray-800 font-medium text-xs">
+                            {new Date(parseInt(taskData.dueDate)).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Progress & Duration Row */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Progress */}
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${taskData.percentComplete === 100 ? 'bg-green-500' :
+                          taskData.percentComplete > 0 ? 'bg-orange-500' : 'bg-gray-400'
+                          }`}></div>
+                        <span className="text-gray-600">Progress:</span>
+                        <span className="text-gray-800 font-medium">{taskData.percentComplete}%</span>
+                      </div>
+
+                      {/* Duration */}
+                      {taskData.timeEstimateDays && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                          <span className="text-gray-600">Duration:</span>
+                          <span className="text-gray-800 font-medium">{taskData.timeEstimateDays}d</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Phase Row */}
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-blue-200">
+                      <div className="w-1.5 h-1.5 bg-purple-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-gray-600">Phase:</span>
+                      <span className="text-gray-800 font-medium truncate">{taskData.phaseName}</span>
+                    </div>
+
+                    {/* No dates message */}
+                    {!taskData.dueDate && !taskData.startDate && !taskData.timeEstimateDays && (
+                      <div className="text-xs text-gray-500 italic">
+                        No timeline data set
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Text Editing Section */}
           <div className="mb-5">
@@ -1710,7 +1776,7 @@ export default function FlowChart() {
             />
             <button
               onClick={() => saveEditedText(contextMenu.nodeId)}
-              className="px-3 py-2 border-none rounded-md bg-emerald-500 text-white cursor-pointer text-sm font-medium w-full mb-4 transition-opacity duration-150 ease-in-out flex items-center justify-center gap-1.5 hover:opacity-90"
+              className="w-full min-w-fit px-3 py-2 border-none rounded-md bg-emerald-500 text-white cursor-pointer text-sm font-medium mb-4 transition-opacity duration-150 ease-in-out flex items-center justify-center gap-1.5 hover:opacity-90"
             >
               <Save size={14} />
               <span>Save Text</span>
@@ -1831,7 +1897,6 @@ export default function FlowChart() {
             </div>
             <button
               onClick={async () => {
-                console.log('🔄 Retrying ClickUp data load...');
                 setIsInitializing(true);
                 setSelectedProject(null);
                 setProjects([]);
@@ -1858,15 +1923,19 @@ export default function FlowChart() {
           timeline={clickupData?.timeline}
           timelineColumns={timelineColumns}
           timelineWidth={timelineWidth}
+          currentViewport={currentViewport}
         />
 
-        {/* Timeline Headers Overlay - Above ReactFlow */}
+        {/* Timeline Headers Overlay - Part of unified calendar system */}
         {timelineColumns && timelineColumns.length > 0 && (
           <div
             className="absolute top-0 left-0 h-full pointer-events-none z-[15]"
             style={{
               width: timelineWidth || Math.max(1600, window.innerWidth),
               height: '100%',
+              // 📅 Apply only horizontal pan and zoom to entire calendar system
+              transform: `translateX(${currentViewport.x}px) scale(${currentViewport.zoom})`,
+              transformOrigin: '0 0'
             }}
           >
             <div className="absolute top-0 left-0 h-full flex">
@@ -1876,25 +1945,31 @@ export default function FlowChart() {
                   className="flex-none relative"
                   style={{ width: `${column.width}px` }}
                 >
-                  {/* Timeline Header - Positioned below 72px header with solid background */}
-                  <div className="text-center py-[16px] px-[8px] bg-white border-r border-gray-200 mt-[72px] relative z-[20] border-b">
+                  {/* Timeline Header - Zoom-compensated positioning */}
+                  <div 
+                    className="text-center py-4 px-2 bg-white border-r border-gray-200 relative z-[20] border-b"
+                    style={{
+                      // 📅 Dynamic margin-top that compensates for zoom to keep headers at consistent screen position
+                      marginTop: `${70 / currentViewport.zoom}px`
+                    }}
+                  >
                     <div
                       style={{
                         color: `rgba(107, 114, 128, ${calendarOpacity})` // text-gray-500
                       }}
-                      className="text-[10px] font-medium text-gray-500 uppercase tracking-[0.5px] mb-1"
+                      className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1"
                     >
                       {column.dayName}
                     </div>
                     <div
                       style={{ color: `rgba(17, 24, 39, ${calendarOpacity})` }} // text-gray-900
-                      className="text-[28px] font-semibold leading-none"
+                      className="text-3xl font-bold leading-none"
                     >
                       {column.dayNumber}
                     </div>
                     <div
                       style={{ color: `rgba(156, 163, 175, ${calendarOpacity})` }} // text-gray-400
-                      className="text-[10px] mt-1"
+                      className="text-xs mt-1"
                     >
                       {column.month}
                     </div>
@@ -1916,11 +1991,10 @@ export default function FlowChart() {
           onNodeContextMenu={handleNodeContextMenu}
           onViewportChange={handleViewportChange}
           defaultViewport={loadSavedViewport()}
-          className={`bg-[#f8f9fa] w-full h-full ${isHandToolActive ? 'cursor-grab' : 'cursor-default'}`}
+          className={`bg-[#f8f9fa] w-full h-full`}
           nodeTypes={nodeTypes}
           multiSelectionKeyCode="Shift"
-          panOnDrag={isHandToolActive ? [0, 1, 2] : [1, 2]}
-          selectionOnDrag={!isHandToolActive}
+          panOnDrag={[1, 2]}
           panOnScroll
           deleteKeyCode={["Backspace", "Delete"]}
           onPaneClick={() => {

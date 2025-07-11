@@ -8,7 +8,6 @@ const generateTimelineColumns = (timeline) => {
   }
 
   const { startDate, endDate, timelineType } = timeline;
-  console.log(`📅 Generating ${timelineType} columns from ${startDate.toDateString()} to ${endDate.toDateString()}`);
 
   switch (timelineType) {
     case 'daily':
@@ -142,13 +141,12 @@ const generateDefaultBusinessDays = () => {
 };
 
 // Enhanced calendar background component with dynamic timeline
-export default function CalendarBackground({ calendarOpacity, timeline, timelineColumns, timelineWidth }) {
+export default function CalendarBackground({ calendarOpacity, timeline, timelineColumns, timelineWidth, currentViewport }) {
     // Use pre-calculated timeline columns if provided, otherwise generate fallback
     const columns = timelineColumns && timelineColumns.length > 0 
       ? timelineColumns 
       : generateDefaultBusinessDays();
 
-    console.log(`📅 Calendar: Rendering ${columns.length} ${columns[0]?.type || 'default'} columns, width: ${timelineWidth}px`);
 
     return (
         <div 
@@ -156,7 +154,10 @@ export default function CalendarBackground({ calendarOpacity, timeline, timeline
             style={{
                 opacity: calendarOpacity,
                 width: timelineWidth || Math.max(1600, window.innerWidth),
-                height: '100%'
+                height: '100%',
+                // 📅 Apply same horizontal pan and zoom as timeline headers
+                transform: currentViewport ? `translateX(${currentViewport.x}px) scale(${currentViewport.zoom})` : 'none',
+                transformOrigin: '0 0'
             }}
         >
             {/* Dynamic Timeline Columns Container */}

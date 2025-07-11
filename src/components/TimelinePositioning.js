@@ -15,7 +15,6 @@ export const calculateTimelineWidth = (timelineColumns) => {
   
   // Ensure minimum width and add some padding
   const finalWidth = Math.max(totalWidth + 200, window.innerWidth); // Add 200px padding
-  console.log(`📏 Timeline width: ${finalWidth}px (${timelineColumns.length} columns, ${totalWidth}px + 200px padding)`);
   return finalWidth;
 };
 
@@ -71,7 +70,6 @@ export const getColumnIndexForDate = (date, timelineColumns) => {
     }
   }
   
-  console.log(`📍 Date ${targetDate.toDateString()} positioned at column ${closestIndex} (${timelineColumns[closestIndex]?.type})`);
   return closestIndex;
 };
 
@@ -88,7 +86,6 @@ export const calculatePhasePosition = (phase, timelineColumns) => {
   if (tasksWithDates.length === 0) {
     // No dates available, use default positioning
     const defaultX = 150 + (phase.phase * 250);
-    console.log(`📍 Phase ${phase.phase}: No dates, using default x: ${defaultX}`);
     return { x: defaultX, width: 200 };
   }
 
@@ -121,7 +118,6 @@ export const calculatePhasePosition = (phase, timelineColumns) => {
   // Calculate width (sum of widths from start to end column, inclusive)
   const width = timelineColumns.slice(startColumnIndex, endColumnIndex + 1).reduce((sum, col) => sum + (col.width || 120), 0);
 
-  console.log(`📍 Phase ${phase.phase}: Positioned at x:${x}, width:${width} (columns ${startColumnIndex}-${endColumnIndex})`);
   return { x: Math.max(x, 50), width: Math.max(width, 200) }; // Ensure minimum values
 };
 
@@ -139,7 +135,6 @@ export const calculateTaskPosition = (task, timelineColumns, stackIndex = 0) => 
     // No date available, use default positioning based on phase
     const defaultX = 150 + (task.phase * 200);
     const defaultY = 760 + (stackIndex * 80);
-    console.log(`📍 Task "${task.name}": No date, using default x:${defaultX}, y:${defaultY}`);
     return { x: defaultX, y: defaultY };
   }
 
@@ -159,7 +154,6 @@ export const calculateTaskPosition = (task, timelineColumns, stackIndex = 0) => 
   const baseY = 760;
   const y = baseY + (stackIndex * 80);
 
-  console.log(`📍 Task "${task.name}": Positioned at x:${x}, y:${y} (column ${columnIndex}, stack ${stackIndex})`);
   return { x: Math.max(x, 50), y }; // Ensure minimum x position
 };
 
@@ -193,7 +187,6 @@ export const groupTasksByColumn = (tasks, timelineColumns) => {
 
   const totalGroups = Object.keys(groupedTasks).length;
   const totalTasks = Object.values(groupedTasks).reduce((sum, group) => sum + group.length, 0);
-  console.log(`📊 Grouped ${totalTasks} tasks into ${totalGroups} timeline columns`);
 
   return groupedTasks;
 }; 

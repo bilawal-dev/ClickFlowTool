@@ -7,6 +7,13 @@ import LegendPanel from './LegendPanel';
 import { clickupApi } from '../services/clickupApi';
 import { Background, BackgroundVariant, Controls } from '@xyflow/react';
 import CalendarBackground from './CalenderBackground';
+// 📅 Import timeline positioning utilities
+import {
+  calculatePhasePosition,
+  calculateTaskPosition,
+  groupTasksByColumn,
+  calculateTimelineWidth
+} from './TimelinePositioning';
 
 
 // Node type mapping for ReactFlow - ALL use Universal node with full handle support
@@ -80,14 +87,14 @@ export default function FlowChart() {
       const saved = localStorage.getItem('flowchart-viewport');
       if (saved) {
         const parsed = JSON.parse(saved);
-        console.log('Loading saved viewport:', parsed);
+        // console.log('Loading saved viewport:', parsed);
         return parsed;
       }
     } catch (error) {
       console.error('Error loading viewport:', error);
     }
-    console.log('Using default viewport - centered view');
-    return { x: 240, y: 250, zoom: 0.75 };
+    // console.log('Using default viewport - centered view');
+    return { x: 10, y: 250, zoom: 0.75 };
   };
 
   // Load saved node positions from localStorage
@@ -96,20 +103,20 @@ export default function FlowChart() {
       const saved = localStorage.getItem('flowchart-node-positions');
       if (saved) {
         const parsed = JSON.parse(saved);
-        console.log('Loading saved node positions:', Object.keys(parsed).length, 'nodes');
+        // console.log('Loading saved node positions:', Object.keys(parsed).length, 'nodes');
         return parsed;
       }
     } catch (error) {
       console.error('Error loading node positions:', error);
     }
-    console.log('Using default node positions');
+    // console.log('Using default node positions');
     return {};
   };
 
   // Save viewport to localStorage
   const saveViewport = useCallback((viewport) => {
     try {
-      console.log('Saving viewport:', viewport);
+      // console.log('Saving viewport:', viewport);
       localStorage.setItem('flowchart-viewport', JSON.stringify(viewport));
     } catch (error) {
       console.error('Error saving viewport:', error);
@@ -123,7 +130,7 @@ export default function FlowChart() {
       nodes.forEach(node => {
         positions[node.id] = node.position;
       });
-      console.log('Saving node positions:', Object.keys(positions).length, 'nodes');
+      // console.log('Saving node positions:', Object.keys(positions).length, 'nodes');
       localStorage.setItem('flowchart-node-positions', JSON.stringify(positions));
     } catch (error) {
       console.error('Error saving node positions:', error);
@@ -136,21 +143,21 @@ export default function FlowChart() {
       const saved = localStorage.getItem('flowchart-handle-configs');
       if (saved) {
         const parsed = JSON.parse(saved);
-        console.log('Loading saved handle configs:', Object.keys(parsed).length, 'nodes');
+        // console.log('Loading saved handle configs:', Object.keys(parsed).length, 'nodes');
         setNodeHandleConfigs(parsed);
         return parsed;
       }
     } catch (error) {
       console.error('Error loading handle configs:', error);
     }
-    console.log('Using default handle configs');
+    // console.log('Using default handle configs');
     return {};
   };
 
   // Save handle configurations to localStorage
   const saveHandleConfigs = useCallback((configs) => {
     try {
-      console.log('Saving handle configs:', Object.keys(configs).length, 'nodes');
+      // console.log('Saving handle configs:', Object.keys(configs).length, 'nodes');
       localStorage.setItem('flowchart-handle-configs', JSON.stringify(configs));
       setNodeHandleConfigs(configs);
     } catch (error) {
@@ -259,6 +266,107 @@ export default function FlowChart() {
     return {}; // Return empty object to use hardcoded positions
   };
 
+  // 📅 Generate timeline columns for positioning (shared between calendar and nodes)
+  const generateTimelineColumns = (timeline) => {
+    if (!timeline || !timeline.startDate || !timeline.endDate) {
+      return [];
+    }
+
+    const { startDate, endDate, timelineType } = timeline;
+    const columns = [];
+
+    switch (timelineType) {
+      case 'daily':
+        let currentDate = new Date(startDate);
+        let columnIndex = 0;
+
+        // Start from Monday of the start week
+        const dayOfWeek = currentDate.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        currentDate.setDate(currentDate.getDate() + daysToMonday);
+
+        while (currentDate <= endDate) {
+          // Only include Monday through Friday
+          if (currentDate.getDay() >= 1 && currentDate.getDay() <= 5) {
+            columns.push({
+              date: new Date(currentDate),
+              dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+              dayNumber: currentDate.getDate(),
+              month: currentDate.toLocaleDateString('en-US', { month: 'short' }),
+              columnIndex: columnIndex++,
+              type: 'day',
+              width: 120
+            });
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+        break;
+
+      case 'weekly':
+        let weekDate = new Date(startDate);
+        let weekColumnIndex = 0;
+
+        // Start from Monday of the start week
+        const weekDayOfWeek = weekDate.getDay();
+        const weekDaysToMonday = weekDayOfWeek === 0 ? -6 : 1 - weekDayOfWeek;
+        weekDate.setDate(weekDate.getDate() + weekDaysToMonday);
+
+        while (weekDate <= endDate) {
+          const weekEnd = new Date(weekDate);
+          weekEnd.setDate(weekDate.getDate() + 4); // Friday
+
+          columns.push({
+            date: new Date(weekDate),
+            dayName: 'Week',
+            dayNumber: `${weekDate.getDate()}-${weekEnd.getDate()}`,
+            month: weekDate.toLocaleDateString('en-US', { month: 'short' }),
+            columnIndex: weekColumnIndex++,
+            type: 'week',
+            width: 160,
+            endDate: weekEnd
+          });
+
+          weekDate.setDate(weekDate.getDate() + 7); // Next Monday
+        }
+        break;
+
+      case 'monthly':
+        let monthDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        let monthColumnIndex = 0;
+
+        while (monthDate <= endDate) {
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
+          columns.push({
+            date: new Date(monthDate),
+            dayName: 'Month',
+            dayNumber: monthDate.toLocaleDateString('en-US', { month: 'short' }),
+            month: monthDate.getFullYear().toString(),
+            columnIndex: monthColumnIndex++,
+            type: 'month',
+            width: 200,
+            endDate: monthEnd
+          });
+
+          monthDate.setMonth(monthDate.getMonth() + 1);
+        }
+        break;
+    }
+
+    console.log(`📅 Generated ${columns.length} ${timelineType} timeline columns`);
+    return columns;
+  };
+
+  // 📅 Memoize timeline columns to avoid regeneration on every render
+  const timelineColumns = React.useMemo(() => {
+    return generateTimelineColumns(clickupData?.timeline);
+  }, [clickupData?.timeline]);
+
+  // 📅 Calculate total timeline width
+  const timelineWidth = React.useMemo(() => {
+    return calculateTimelineWidth(timelineColumns);
+  }, [timelineColumns]);
+
   // Default node positions - now using real ClickUp data when available
   const getDefaultNodes = () => {
     const savedPositions = loadSavedNodePositions();
@@ -269,7 +377,7 @@ export default function FlowChart() {
     // Level headers with better spacing - use custom defaults if available
     const levelHeaders = [
       { id: 'level1-header', type: 'header', position: customDefaults['level1-header'] || { x: 50, y: 20 }, data: { label: '🔄 LEVEL 1: CRM LOGIC FLOW' }, style: nodeStyles.levelHeader },
-      { id: 'level2-header', type: 'header', position: customDefaults['level2-header'] || { x: 50, y: 380 }, data: { label: '🎯 LEVEL 2: PROJECT PHASES (ClickUp)' }, style: nodeStyles.levelHeader },
+      { id: 'level2-header', type: 'header', position: customDefaults['level2-header'] || { x: 10, y: 310 }, data: { label: '🎯 LEVEL 2: PROJECT PHASES (ClickUp)' }, style: nodeStyles.levelHeader },
       { id: 'level3-header', type: 'header', position: customDefaults['level3-header'] || { x: 50, y: 680 }, data: { label: '📋 LEVEL 3: PHASE TASKS (ClickUp)' }, style: nodeStyles.levelHeader }
     ];
 
@@ -284,15 +392,28 @@ export default function FlowChart() {
       { id: 'template-created', type: 'levelDrop', position: customDefaults['template-created'] || { x: 1300, y: 100 }, data: { label: '📋 Project Template\nCreated' }, style: nodeStyles.automation }
     ];
 
-    // LEVEL 2: Only generate from real ClickUp data - no fallback
+    // LEVEL 2: Generate phase nodes with timeline-based positioning
     let level2Nodes = [];
     if (clickupData && clickupData.phases) {
-      console.log('🎯 Generating nodes from ClickUp data:', clickupData.phases.length, 'phases');
+      console.log('🎯 Generating timeline-based phase nodes:', clickupData.phases.length, 'phases');
 
-      // Generate phase nodes with dynamic positioning
       level2Nodes = clickupData.phases.map((phase, index) => {
         const nodeId = `phase-${phase.phase}`;
-        const xPosition = 150 + (index * 300); // Space them horizontally
+
+        // 📅 Use timeline positioning if available, fallback to default
+        let position;
+        if (customDefaults[nodeId]) {
+          // Use saved custom position
+          position = customDefaults[nodeId];
+        } else if (clickupData.timeline && timelineColumns.length > 0) {
+          // Calculate timeline-based position
+          const phasePos = calculatePhasePosition(phase, timelineColumns);
+          position = { x: phasePos.x, y: 460 };
+          console.log(`📍 Phase ${phase.phase} positioned at timeline x: ${phasePos.x}`);
+        } else {
+          // Fallback to default spacing
+          position = { x: 150 + (index * 300), y: 460 };
+        }
 
         // Create milestone style with phase colors
         const phaseStyle = {
@@ -300,12 +421,23 @@ export default function FlowChart() {
           border: `3px solid ${phase.color}`,
         };
 
+        // 📅 Enhanced phase label with timeline info
+        let phaseLabel = `${phase.emoji} Phase ${phase.phase}\n${phase.name}\n(${phase.totalTasks} tasks, ${phase.averageCompletion}%)`;
+
+        if (phase.startDate && phase.endDate) {
+          const startStr = phase.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const endStr = phase.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          phaseLabel += `\n📅 ${startStr} - ${endStr}`;
+        }
+
+        phaseLabel += '\n(Double-click to expand)';
+
         return {
           id: nodeId,
           type: 'milestone',
-          position: customDefaults[nodeId] || { x: xPosition, y: 460 },
+          position,
           data: {
-            label: `${phase.emoji} Phase ${phase.phase}\n${phase.name}\n(${phase.totalTasks} tasks, ${phase.averageCompletion}%)\n(Double-click to expand)`,
+            label: phaseLabel,
             phaseData: phase // Store phase data for reference
           },
           style: phaseStyle
@@ -313,18 +445,50 @@ export default function FlowChart() {
       });
     }
 
-    // LEVEL 3: Only generate from real ClickUp data - no fallback
+    // LEVEL 3: Generate task nodes with timeline-based positioning
     let taskNodes = [];
     if (clickupData && clickupData.phases) {
-      console.log('📋 Generating task nodes from ClickUp data');
+      console.log('📋 Generating timeline-based task nodes');
 
-      clickupData.phases.forEach((phase, phaseIndex) => {
-        const baseX = 120 + (phaseIndex * 230); // Align under phase nodes
+      // Group all tasks by their timeline columns for proper stacking
+      const allTasks = clickupData.phases.flatMap(phase => phase.tasks);
+      const groupedTasks = timelineColumns.length > 0 ? groupTasksByColumn(allTasks, timelineColumns) : {};
 
+      clickupData.phases.forEach((phase) => {
         phase.tasks.forEach((task, taskIndex) => {
           const nodeId = `task-${task.id}`;
-          const xPosition = baseX + (taskIndex % 2) * 90; // Two columns under each phase
-          const yPosition = 760 + Math.floor(taskIndex / 2) * 80; // Stack vertically
+
+          // 📅 Use timeline positioning if available
+          let position;
+          if (customDefaults[nodeId]) {
+            // Use saved custom position
+            position = customDefaults[nodeId];
+          } else if (clickupData.timeline && timelineColumns.length > 0) {
+            // Find this task's position within its column for stacking
+            const taskDate = task.dueDate || task.startDate;
+            let taskIndexInColumn = 0;
+
+            if (taskDate) {
+              // Find which tasks are in the same column
+              Object.entries(groupedTasks).forEach(([columnIndex, tasksInColumn]) => {
+                const taskInColumn = tasksInColumn.findIndex(t => t.id === task.id);
+                if (taskInColumn !== -1) {
+                  taskIndexInColumn = taskInColumn;
+                }
+              });
+            }
+
+            // Calculate timeline-based position
+            const taskPos = calculateTaskPosition(task, timelineColumns, taskIndexInColumn);
+            position = taskPos;
+            console.log(`📍 Task "${task.name}" positioned at timeline x: ${taskPos.x}, y: ${taskPos.y}`);
+          } else {
+            // Fallback to default positioning
+            const baseX = 120 + (phase.phase * 230);
+            const xPosition = baseX + (taskIndex % 2) * 90;
+            const yPosition = 760 + Math.floor(taskIndex / 2) * 80;
+            position = { x: xPosition, y: yPosition };
+          }
 
           // Create task style with status-based coloring
           const completionColor = task.percentComplete === 100 ? '#4caf50' :
@@ -337,12 +501,23 @@ export default function FlowChart() {
               task.percentComplete > 0 ? '#fff3e0' : '#f3e5f5'
           };
 
+          // 📅 Enhanced task label with timeline info
+          let taskLabel = `${task.name}\n(${task.percentComplete}% complete)`;
+
+          if (task.dueDate) {
+            const dueStr = new Date(parseInt(task.dueDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            taskLabel += `\n📅 Due: ${dueStr}`;
+          } else if (task.startDate) {
+            const startStr = new Date(parseInt(task.startDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            taskLabel += `\n📅 Start: ${startStr}`;
+          }
+
           taskNodes.push({
             id: nodeId,
             type: 'task',
-            position: customDefaults[nodeId] || { x: xPosition, y: yPosition },
+            position,
             data: {
-              label: `${task.name}\n(${task.percentComplete}% complete)`,
+              label: taskLabel,
               taskData: task, // Store task data for reference
               parentPhase: phase.phase
             },
@@ -537,7 +712,7 @@ export default function FlowChart() {
     const savedViewport = loadSavedViewport();
     if (reactFlowInstance) {
       setTimeout(() => {
-        console.log('Setting viewport on mount:', savedViewport);
+        // console.log('Setting viewport on mount:', savedViewport);
         reactFlowInstance.setViewport(savedViewport);
       }, 100); // Small delay to ensure ReactFlow is ready
     }
@@ -581,12 +756,12 @@ export default function FlowChart() {
         return; // Don't load template if we already have a project
       }
 
-      console.log('🔄 Loading template structure as fallback...');
+      // console.log('🔄 Loading template structure as fallback...');
       // Don't set loading during initialization - handled by isInitializing
 
       try {
         const processedData = await clickupApi.getProcessedTemplateData();
-        console.log('✅ Template structure loaded as fallback:', processedData);
+        // console.log('✅ Template structure loaded as fallback:', processedData);
         setClickupData(processedData);
 
       } catch (error) {
@@ -606,7 +781,7 @@ export default function FlowChart() {
   useEffect(() => {
     const loadProjectTasks = async () => {
       if (!selectedProject) {
-        console.log('⏳ No project selected, using template data only');
+        // console.log('⏳ No project selected, using template data only');
         if (isInitializing) {
           // During initialization, end the process if no project available
           setIsInitializing(false);
@@ -614,7 +789,7 @@ export default function FlowChart() {
         return;
       }
 
-      console.log(`🔄 Loading real tasks from: ${selectedProject.customerFolder} → ${selectedProject.name}`);
+      // console.log(`🔄 Loading real tasks from: ${selectedProject.customerFolder} → ${selectedProject.name}`);
 
       // Only show loading spinner if not during initialization (user switching projects)
       if (!isInitializing) {
@@ -624,19 +799,19 @@ export default function FlowChart() {
       try {
         // Get project tasks and merge with template structure
         const projectData = await clickupApi.getProcessedProjectData(selectedProject.id);
-        console.log('✅ Project tasks loaded successfully:', projectData);
+        // console.log('✅ Project tasks loaded successfully:', projectData);
 
         // Keep template structure but use real project task data
         setClickupData(projectData);
 
       } catch (error) {
         console.error('❌ Failed to load project tasks:', error);
-        console.log('📋 Falling back to template data structure');
+        // console.log('📋 Falling back to template data structure');
         // Keep existing template data as fallback
       } finally {
         // End initialization if this was the initial load
         if (isInitializing) {
-          console.log('🎉 Initial loading complete!');
+          // console.log('🎉 Initial loading complete!');
           setIsInitializing(false);
         } else {
           // End loading spinner for project switching
@@ -652,21 +827,21 @@ export default function FlowChart() {
   // 🚀 Load franchise locations for dropdown
   useEffect(() => {
     const loadProjects = async () => {
-      console.log('🚀 Loading franchise location projects...');
+      // console.log('🚀 Loading franchise location projects...');
       setIsLoadingProjects(true);
 
       try {
         const projectsData = await clickupApi.getUserProjects();
-        console.log('✅ Projects loaded successfully:', projectsData);
+        // console.log('✅ Projects loaded successfully:', projectsData);
         const projects = projectsData.projects || [];
         setProjects(projects);
 
         // Auto-select first project if available and during initialization
         if (projects.length > 0 && !selectedProject && isInitializing) {
-          console.log('🎯 Auto-selecting first project for initial display:', projects[0].name);
+          // console.log('🎯 Auto-selecting first project for initial display:', projects[0].name);
           setSelectedProject(projects[0]);
         } else if (projects.length === 0 && isInitializing) {
-          console.log('⚠️ No projects found, ending initialization');
+          // console.log('⚠️ No projects found, ending initialization');
           setIsInitializing(false);
         }
       } catch (error) {
@@ -674,7 +849,7 @@ export default function FlowChart() {
         setProjects([]);
         // End initialization if projects fail to load
         if (isInitializing) {
-          console.log('❌ Projects failed to load, ending initialization');
+          // console.log('❌ Projects failed to load, ending initialization');
           setIsInitializing(false);
         }
       } finally {
@@ -690,7 +865,7 @@ export default function FlowChart() {
 
   // Handle project selection
   const handleProjectSelect = (project) => {
-    console.log('🎯 Project selected:', project.name);
+    // console.log('🎯 Project selected:', project.name);
     setSelectedProject(project);
     setShowProjectDropdown(false);
     setActiveHeaderDropdown(null);
@@ -845,7 +1020,7 @@ export default function FlowChart() {
 
     // Save to a special localStorage key for default positions
     localStorage.setItem('flowchart-default-positions', JSON.stringify(defaultPositions));
-    console.log('Saved current layout as new default:', Object.keys(defaultPositions).length, 'nodes');
+    // console.log('Saved current layout as new default:', Object.keys(defaultPositions).length, 'nodes');
     alert('✅ Current layout saved as default! This will be the new reset position.');
   };
 
@@ -855,7 +1030,7 @@ export default function FlowChart() {
 
   // Reset to overview
   const resetView = () => {
-    const newViewport = { x: 240, y: 250, zoom: 0.75 };
+    const newViewport = { x: 10, y: 250, zoom: 0.75 };
 
     if (reactFlowInstance) {
       // reactFlowInstance.fitView({ padding: 0.1, maxZoom: 0.75 })
@@ -870,16 +1045,16 @@ export default function FlowChart() {
     let newViewport;
     switch (level) {
       case 1:
-        newViewport = { x: 240, y: 350, zoom: 1.0 };
+        newViewport = { x: 10, y: 350, zoom: 1.0 };
         break;
       case 2:
-        newViewport = { x: 240, y: -150, zoom: 1.0 };
+        newViewport = { x: 10, y: -150, zoom: 1.0 };
         break;
       case 3:
-        newViewport = { x: 240, y: -250, zoom: 1.0 };
+        newViewport = { x: 10, y: -250, zoom: 1.0 };
         break;
       default:
-        newViewport = { x: 240, y: 250, zoom: 0.75 };
+        newViewport = { x: 10, y: 250, zoom: 0.75 };
     }
     if (reactFlowInstance) {
       reactFlowInstance.setViewport(newViewport);
@@ -1290,6 +1465,13 @@ export default function FlowChart() {
                   `Viewing for: ${selectedProject.customerFolder} • ${selectedProject.name}` :
                   'Standard franchise project workflow'
                 }
+                {/* 📅 Timeline status indicator */}
+                {clickupData?.timeline && (
+                  <div className="px-2 py-1 text-blue-700 rounded-md text-xs font-medium">
+                    Timeline: <span className='capitalize'>{clickupData.timeline.timelineType}</span>
+                    ({clickupData.timeline.duration} days)
+                  </div>
+                )}
               </p>
             </div>
           </div>
@@ -1395,8 +1577,8 @@ export default function FlowChart() {
                                           key={project.id}
                                           onClick={() => handleProjectSelect(project)}
                                           className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedProject?.id === project.id
-                                              ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500'
-                                              : 'hover:bg-gray-50 text-gray-700'
+                                            ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500'
+                                            : 'hover:bg-gray-50 text-gray-700'
                                             }`}
                                         >
                                           <div className="flex items-center gap-2">
@@ -1665,9 +1847,63 @@ export default function FlowChart() {
       )}
 
       {/* ReactFlow Container with Calendar Background */}
-      <div className="reactflow-wrapper relative w-screen h-screen">
+      <div className="reactflow-wrapper relative" style={{
+        width: Math.max(timelineWidth, window.innerWidth),
+        height: '100vh',
+        minWidth: '100vw'
+      }}>
         {/* Calendar Background */}
-        <CalendarBackground calendarOpacity={calendarOpacity} />
+        <CalendarBackground
+          calendarOpacity={calendarOpacity}
+          timeline={clickupData?.timeline}
+          timelineColumns={timelineColumns}
+          timelineWidth={timelineWidth}
+        />
+
+        {/* Timeline Headers Overlay - Above ReactFlow */}
+        {timelineColumns && timelineColumns.length > 0 && (
+          <div
+            className="absolute top-0 left-0 h-full pointer-events-none z-[15]"
+            style={{
+              width: timelineWidth || Math.max(1600, window.innerWidth),
+              height: '100%',
+            }}
+          >
+            <div className="absolute top-0 left-0 h-full flex">
+              {timelineColumns.map((column, index) => (
+                <div
+                  key={index}
+                  className="flex-none relative"
+                  style={{ width: `${column.width}px` }}
+                >
+                  {/* Timeline Header - Positioned below 72px header with solid background */}
+                  <div className="text-center py-[16px] px-[8px] bg-white border-r border-gray-200 mt-[72px] relative z-[20] border-b">
+                    <div
+                      style={{
+                        color: `rgba(107, 114, 128, ${calendarOpacity})` // text-gray-500
+                      }}
+                      className="text-[10px] font-medium text-gray-500 uppercase tracking-[0.5px] mb-1"
+                    >
+                      {column.dayName}
+                    </div>
+                    <div
+                      style={{ color: `rgba(17, 24, 39, ${calendarOpacity})` }} // text-gray-900
+                      className="text-[28px] font-semibold leading-none"
+                    >
+                      {column.dayNumber}
+                    </div>
+                    <div
+                      style={{ color: `rgba(156, 163, 175, ${calendarOpacity})` }} // text-gray-400
+                      className="text-[10px] mt-1"
+                    >
+                      {column.month}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ReactFlow */}
         <ReactFlow
@@ -1699,7 +1935,12 @@ export default function FlowChart() {
           }}
           connectionMode="loose"
           connectOnClick={false}
-          style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: Math.max(timelineWidth, window.innerWidth),
+            height: '100vh'
+          }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
           <Controls />

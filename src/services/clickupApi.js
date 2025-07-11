@@ -5,6 +5,8 @@ const BASE_URL = 'https://api.clickup.com/api/v2';
 const KNOWN_IDS = {
   teamId: '9013410499',
   templatesSpaceId: '90131823880', 
+  // projectsSpaceId: '90137209740',
+  projectsSpaceId: '90137498382', // Brandon's test space "Brandon's copy"
   franchiseTemplateListId: '901314428250',
   customFields: {
     percentComplete: 'e50bab98-75cd-40c2-a193-ce2811e1713b',
@@ -59,6 +61,78 @@ const apiCall = async (endpoint, options = {}) => {
   }
 };
 
+// 📅 Timeline Calculation Helpers
+const calculateProjectTimeline = (allTasks) => {
+  // Filter tasks with valid dates
+  const tasksWithDates = allTasks.filter(task => task.dueDate || task.startDate);
+  
+  if (tasksWithDates.length === 0) {
+    console.warn('⚠️ No tasks with dates found, using default timeline');
+    return {
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      duration: 30,
+      timelineType: 'daily'
+    };
+  }
+
+  // Convert timestamps to dates and find min/max
+  const dates = [];
+  tasksWithDates.forEach(task => {
+    if (task.startDate) dates.push(new Date(parseInt(task.startDate)));
+    if (task.dueDate) dates.push(new Date(parseInt(task.dueDate)));
+  });
+
+  const startDate = new Date(Math.min(...dates));
+  const endDate = new Date(Math.max(...dates));
+  const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+
+  // Determine timeline type based on duration
+  let timelineType = 'daily';
+  if (duration > 90) {
+    timelineType = 'monthly';
+  } else if (duration > 30) {
+    timelineType = 'weekly';
+  }
+
+  console.log(`📅 Project Timeline: ${startDate.toDateString()} to ${endDate.toDateString()} (${duration} days, ${timelineType})`);
+
+  return {
+    startDate,
+    endDate,
+    duration,
+    timelineType
+  };
+};
+
+const calculatePhaseTimeline = (phase) => {
+  const tasksWithDates = phase.tasks.filter(task => task.dueDate || task.startDate);
+  
+  if (tasksWithDates.length === 0) {
+    return {
+      startDate: null,
+      endDate: null,
+      duration: 0
+    };
+  }
+
+  const dates = [];
+  tasksWithDates.forEach(task => {
+    if (task.startDate) dates.push(new Date(parseInt(task.startDate)));
+    if (task.dueDate) dates.push(new Date(parseInt(task.dueDate)));
+  });
+
+  const startDate = new Date(Math.min(...dates));
+  const endDate = new Date(Math.max(...dates));
+  const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+
+  return {
+    startDate,
+    endDate,
+    duration
+  };
+};
+
 export const clickupApi = {
   
   // 🔍 Discovery APIs - Find user's accessible data
@@ -83,20 +157,24 @@ export const clickupApi = {
     return data;
   },
 
-  // 🏢 Projects Space Discovery - For franchise location projects
+  // 🏢 Projects Space Discovery - Use direct space ID (more robust)
   async findProjectsSpace(teamId = KNOWN_IDS.teamId) {
-    console.log(`🔎 Looking for Projects space in team ${teamId}...`);
-    const spacesData = await this.getSpaces(teamId);
-    
-    const projectsSpace = spacesData.spaces?.find(space => 
-      space.name.toLowerCase() === 'projects'
-    );
-    
-    if (projectsSpace) {
-      console.log(`✅ Found Projects space: ${projectsSpace.name} (${projectsSpace.id})`);
-      return projectsSpace;
-    } else {
-      console.warn('⚠️ Projects space not found');
+    console.log(`🔎 Using direct Projects space ID: ${KNOWN_IDS.projectsSpaceId}...`);
+
+    try {
+      // Fetch all spaces to verify the space exists and get its details
+      const spacesData = await this.getSpaces(teamId);
+      const projectsSpace = spacesData.spaces?.find(space => space.id === KNOWN_IDS.projectsSpaceId);
+
+      if (projectsSpace) {
+        console.log(`✅ Found Projects space: ${projectsSpace.name} (${projectsSpace.id})`);
+        return projectsSpace;
+      } else {
+        console.warn(`⚠️ Projects space with ID ${KNOWN_IDS.projectsSpaceId} not found`);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching Projects space:', error);
       return null;
     }
   },
@@ -117,7 +195,7 @@ export const clickupApi = {
 
   async getProjectsStructure(teamId = KNOWN_IDS.teamId) {
     console.log('🏗️ Discovering full Projects space structure...');
-    
+
     try {
       // Find Projects space
       const projectsSpace = await this.findProjectsSpace(teamId);
@@ -136,9 +214,9 @@ export const clickupApi = {
       // Process customer folders in parallel
       if (foldersData.status === 'fulfilled' && foldersData.value.folders) {
         console.log(`📁 Found ${foldersData.value.folders.length} customer folders - fetching lists in parallel...`);
-        
+
         // Create promises for all folder list fetches
-        const folderListPromises = foldersData.value.folders.map(folder => 
+        const folderListPromises = foldersData.value.folders.map(folder =>
           this.getFolderLists(folder.id)
             .then(listsData => ({ folder, listsData, success: true }))
             .catch(error => ({ folder, error, success: false }))
@@ -151,10 +229,10 @@ export const clickupApi = {
         folderResults.forEach(result => {
           if (result.status === 'fulfilled') {
             const { folder, listsData, success, error } = result.value;
-            
+
             if (success && listsData.lists) {
               console.log(`✅ Processed folder: ${folder.name} (${listsData.lists.length} lists)`);
-              
+
               listsData.lists.forEach(list => {
                 allLocationLists.push({
                   id: list.id,
@@ -178,7 +256,7 @@ export const clickupApi = {
       // Process direct lists in the Projects space (no folder)
       if (directListsData.status === 'fulfilled' && directListsData.value.lists) {
         console.log(`📄 Found ${directListsData.value.lists.length} direct lists in Projects space`);
-        
+
         directListsData.value.lists.forEach(list => {
           allLocationLists.push({
             id: list.id,
@@ -198,15 +276,15 @@ export const clickupApi = {
 
       const folderCount = foldersData.status === 'fulfilled' ? foldersData.value.folders?.length || 0 : 0;
       console.log(`✅ Optimized fetch complete! Found ${allLocationLists.length} location projects across ${folderCount} customer folders`);
-      
+
       return {
         projectsSpace,
         customerFolders: foldersData.status === 'fulfilled' ? foldersData.value.folders || [] : [],
-        locationLists: allLocationLists.sort((a, b) => 
+        locationLists: allLocationLists.sort((a, b) =>
           a.customerFolder.localeCompare(b.customerFolder) || a.name.localeCompare(b.name)
         )
       };
-      
+
     } catch (error) {
       console.error('❌ Error discovering Projects structure:', error);
       throw error;
@@ -406,6 +484,13 @@ export const clickupApi = {
           phase.completedTasks = phase.tasks.filter(t => t.percentComplete === 100).length;
           const totalCompletion = phase.tasks.reduce((sum, t) => sum + t.percentComplete, 0);
           phase.averageCompletion = Math.round(totalCompletion / phase.totalTasks);
+          
+          // 📅 Add timeline calculations to each phase
+          const phaseTimeline = calculatePhaseTimeline(phase);
+          phase.timeline = phaseTimeline;
+          phase.startDate = phaseTimeline.startDate;
+          phase.endDate = phaseTimeline.endDate;
+          phase.duration = phaseTimeline.duration;
         });
       }
 
@@ -441,16 +526,16 @@ export const clickupApi = {
   // 🚀 Project APIs - Real project data fetching
   async getUserProjects(teamId = KNOWN_IDS.teamId) {
     console.log('🔎 Fetching franchise location projects...');
-    
+
     try {
       const projectsStructure = await this.getProjectsStructure(teamId);
-      
+
       console.log(`✅ Found ${projectsStructure.locationLists.length} franchise locations`);
-      return { 
+      return {
         projects: projectsStructure.locationLists,
         structure: projectsStructure
       };
-      
+
     } catch (error) {
       console.error('❌ Error fetching user projects:', error);
       throw error;
@@ -459,15 +544,15 @@ export const clickupApi = {
 
   async getProjectTasks(projectId) {
     console.log(`📋 Fetching tasks for project ${projectId}...`);
-    
+
     try {
       const data = await apiCall(`/list/${projectId}/task?include_closed=true&include_subtasks=true`);
-      
+
       console.log(`📊 Project Tasks Summary for ${projectId}:`);
       console.log(`  • Total tasks: ${data.tasks?.length || 0}`);
-      
+
       return data;
-      
+
     } catch (error) {
       console.error(`❌ Error fetching tasks for project ${projectId}:`, error);
       throw error;
@@ -476,7 +561,7 @@ export const clickupApi = {
 
   async getProcessedProjectData(projectId) {
     console.log(`🔄 Processing project data for project ${projectId}...`);
-    
+
     try {
       // Fetch project details and tasks
       const [projectDetails, tasksData] = await Promise.all([
@@ -500,13 +585,13 @@ export const clickupApi = {
       if (tasksData.tasks) {
         tasksData.tasks.forEach(task => {
           // Try to find phase field (might have different ID than template)
-          let phaseField = task.custom_fields?.find(f => 
-            f.name?.toLowerCase().includes('phase') || 
+          let phaseField = task.custom_fields?.find(f =>
+            f.name?.toLowerCase().includes('phase') ||
             f.id === KNOWN_IDS.customFields.phase
           );
-          
+
           let phaseValue = 0; // default to phase 0
-          
+
           if (phaseField?.value) {
             if (typeof phaseField.value === 'number') {
               phaseValue = phaseField.value;
@@ -532,12 +617,12 @@ export const clickupApi = {
           }
 
           // Try to find percent complete field
-          let percentField = task.custom_fields?.find(f => 
-            f.name?.toLowerCase().includes('complete') || 
+          let percentField = task.custom_fields?.find(f =>
+            f.name?.toLowerCase().includes('complete') ||
             f.name?.toLowerCase().includes('%') ||
             f.id === KNOWN_IDS.customFields.percentComplete
           );
-          
+
           const percentComplete = parseInt(percentField?.value || '0');
 
           const processedTask = {
@@ -552,7 +637,12 @@ export const clickupApi = {
             creator: task.creator,
             watchers: task.watchers || [],
             dueDate: task.due_date,
-            startDate: task.start_date
+            startDate: task.start_date,
+            // 📅 Enhanced timeline data
+            dueDateFormatted: task.due_date ? new Date(parseInt(task.due_date)).toDateString() : null,
+            startDateFormatted: task.start_date ? new Date(parseInt(task.start_date)).toDateString() : null,
+            timeEstimate: task.time_estimate, // milliseconds
+            timeEstimateDays: task.time_estimate ? Math.ceil(task.time_estimate / (1000 * 60 * 60 * 24)) : null
           };
 
           allTasks.push(processedTask);
@@ -582,16 +672,26 @@ export const clickupApi = {
         });
       }
 
+      // 📅 Calculate overall project timeline
+      const projectTimeline = calculateProjectTimeline(allTasks);
+
       const processedData = {
         projectDetails,
         phases: Object.values(phaseGroups).sort((a, b) => a.phase - b.phase),
         allTasks,
         customFields,
+        // 📅 Add timeline information
+        timeline: projectTimeline,
         summary: {
           totalPhases: Object.keys(phaseGroups).length,
           totalTasks: allTasks.length,
           overallCompletion: allTasks.length > 0 ? 
-            Math.round(allTasks.reduce((sum, t) => sum + t.percentComplete, 0) / allTasks.length) : 0
+            Math.round(allTasks.reduce((sum, t) => sum + t.percentComplete, 0) / allTasks.length) : 0,
+          // 📅 Timeline summary
+          projectStartDate: projectTimeline.startDate,
+          projectEndDate: projectTimeline.endDate,
+          projectDuration: projectTimeline.duration,
+          timelineType: projectTimeline.timelineType
         }
       };
 
@@ -600,13 +700,13 @@ export const clickupApi = {
       console.log(`  • ${processedData.summary.totalPhases} phases`);
       console.log(`  • ${processedData.summary.totalTasks} tasks`);
       console.log(`  • ${processedData.summary.overallCompletion}% overall completion`);
-      
+
       processedData.phases.forEach(phase => {
         console.log(`  • ${phase.emoji} ${phase.name}: ${phase.totalTasks} tasks, ${phase.averageCompletion}% complete`);
       });
 
       return processedData;
-      
+
     } catch (error) {
       console.error('❌ Error processing project data:', error);
       throw error;
@@ -637,7 +737,7 @@ export const clickupApi = {
 };
 
 // Export constants for use in components
-export { KNOWN_IDS, PHASE_MAPPING };
+export { KNOWN_IDS, PHASE_MAPPING, calculateProjectTimeline, calculatePhaseTimeline };
 
 console.log('📦 ClickUp API Service initialized');
 console.log('🔑 API Token status:', API_TOKEN ? '✅ Loaded' : '❌ Missing');

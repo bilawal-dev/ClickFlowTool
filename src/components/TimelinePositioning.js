@@ -18,6 +18,97 @@ export const calculateTimelineWidth = (timelineColumns) => {
   return finalWidth;
 };
 
+// 🎯 Calculate smart initial viewport positioning
+export const calculateSmartInitialViewport = (timelineColumns, clickupData) => {
+  // Default fallback viewport
+  const defaultViewport = { x: 10, y: 250, zoom: 0.75 };
+  
+  if (!timelineColumns || timelineColumns.length === 0) {
+    console.warn('⚠️ No timeline columns available for smart positioning');
+    return defaultViewport;
+  }
+
+  const today = new Date();
+  
+  // Find the column closest to today's date
+  let closestColumnIndex = 0;
+  let closestDistance = Math.abs(today - timelineColumns[0].date);
+  
+  for (let i = 1; i < timelineColumns.length; i++) {
+    const distance = Math.abs(today - timelineColumns[i].date);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestColumnIndex = i;
+    }
+  }
+
+  // Calculate the x position of the current week/month column
+  const currentColumnX = timelineColumns.slice(0, closestColumnIndex).reduce((sum, col) => {
+    return sum + (col.width || 120);
+  }, 0);
+
+  // Center the viewport on the current time period
+  // Account for screen width to center the current column
+  const screenWidth = window.innerWidth;
+  const centerOffset = screenWidth / 2;
+  
+  // Position so current column is roughly in center of screen
+  const targetX = -(currentColumnX - centerOffset);
+  
+  // Determine optimal zoom level based on timeline span and active phases
+  let optimalZoom = 0.75; // Default zoom
+  
+  if (clickupData && clickupData.phases) {
+    // If we have phase data, try to fit active phases in view
+    const activePhases = clickupData.phases.filter(phase => 
+      phase.startDate && phase.endDate &&
+      (phase.startDate <= today && phase.endDate >= today) || // Currently active
+      (phase.startDate > today && phase.startDate <= new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)) // Starting within 30 days
+    );
+    
+    if (activePhases.length > 0) {
+      // Calculate span needed to show active phases
+      const phaseDates = [];
+      activePhases.forEach(phase => {
+        if (phase.startDate) phaseDates.push(phase.startDate);
+        if (phase.endDate) phaseDates.push(phase.endDate);
+      });
+      
+      const earliestDate = new Date(Math.min(...phaseDates));
+      const latestDate = new Date(Math.max(...phaseDates));
+      
+      // Find column indices for phase span
+      const startColumnIndex = getColumnIndexForDate(earliestDate, timelineColumns);
+      const endColumnIndex = getColumnIndexForDate(latestDate, timelineColumns);
+      
+      // Calculate width needed to show this span
+      const spanWidth = timelineColumns.slice(startColumnIndex, endColumnIndex + 1)
+        .reduce((sum, col) => sum + (col.width || 120), 0);
+      
+      // Adjust zoom to fit the span with some padding
+      const availableWidth = screenWidth * 0.8; // Use 80% of screen width
+      if (spanWidth > availableWidth) {
+        optimalZoom = Math.max(0.3, availableWidth / spanWidth);
+      } else {
+        optimalZoom = Math.min(1.2, availableWidth / spanWidth);
+      }
+    }
+  }
+  
+  // For monthly view, use a more zoomed out approach
+  if (timelineColumns[0] && timelineColumns[0].type === 'month') {
+    optimalZoom = Math.max(0.5, optimalZoom * 0.8);
+  }
+  
+  console.log(`📍 Smart positioning: Current column ${closestColumnIndex}, X: ${targetX}, Zoom: ${optimalZoom}`);
+  
+  return {
+    x: Math.max(targetX, -timelineColumns.length * 200), // Don't go too far left
+    y: 250, // Keep same Y position
+    zoom: optimalZoom
+  };
+};
+
 // Find which column index a date should be positioned in
 export const getColumnIndexForDate = (date, timelineColumns) => {
   if (!date || !timelineColumns || timelineColumns.length === 0) {

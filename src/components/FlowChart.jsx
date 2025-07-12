@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReactFlow, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react';
-import { Settings, Hand, RotateCcw, CheckCircle, XCircle, FolderOpen, Folder, Save, Link, TestTube, X, MapPin, Edit, Check, ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Loader2, AlertTriangle, RefreshCw, Layers, LayoutGrid, ChevronDown, Zap, HelpCircle, MousePointer, Move, Trash2, Square, Calendar, User, Search, Menu, Home, BarChart3, FileText, Briefcase } from 'lucide-react';
+import { Settings, Hand, RotateCcw, CheckCircle, XCircle, FolderOpen, Folder, Save, Link, TestTube, X, MapPin, Edit, Check, ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Layers, LayoutGrid, ChevronDown, Zap, HelpCircle, MousePointer, Move, Trash2, Square, Calendar, User, Search, Menu, Home, BarChart3, FileText, Briefcase } from 'lucide-react';
 import UniversalNode from './UniversalNode';
 import HeaderNode from './HeaderNode';
 import LegendPanel from './LegendPanel';
+import TaskTooltip from './TaskTooltip';
+import LoadingErrorStates from './LoadingErrorStates';
+import FlowChartHeader from './FlowChartHeader';
 import { clickupApi } from '../services/clickupApi';
 import { Background, BackgroundVariant, Controls } from '@xyflow/react';
 import CalendarBackground from './CalenderBackground';
@@ -12,8 +15,10 @@ import {
   calculatePhasePosition,
   calculateTaskPosition,
   groupTasksByColumn,
-  calculateTimelineWidth
+  calculateTimelineWidth,
+  calculateSmartInitialViewport
 } from './TimelinePositioning';
+
 
 
 // Node type mapping for ReactFlow - ALL use Universal node with full handle support
@@ -49,6 +54,9 @@ export default function FlowChart() {
   const [searchTerm, setSearchTerm] = useState(''); // Search functionality
   const [expandedFolders, setExpandedFolders] = useState(new Set()); // Track expanded folders
 
+  // 🏷️ Tooltip state for task hover details
+  const [tooltip, setTooltip] = useState({ visible: false, data: null, position: { x: 0, y: 0 } });
+
   // 📅 Timeline header positioning - track ReactFlow viewport
   const [currentViewport, setCurrentViewport] = useState({ x: 10, y: 250, zoom: 0.75 });
 
@@ -62,18 +70,29 @@ export default function FlowChart() {
     return baseKey; // Use global key for template mode
   }, [selectedProject]);
 
-  // Load saved viewport from localStorage
+  // Load saved viewport from localStorage or calculate smart initial position
   const loadSavedViewport = () => {
     try {
       const key = getStorageKey('flowchart-viewport');
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
+        console.log('📍 Using saved viewport:', parsed);
         return parsed;
       }
     } catch (error) {
       console.error('Error loading viewport:', error);
     }
+    
+    // 🎯 No saved viewport found - calculate smart initial positioning
+    if (timelineColumns.length > 0) {
+      const smartViewport = calculateSmartInitialViewport(timelineColumns, clickupData);
+      console.log('🎯 Using smart initial viewport:', smartViewport);
+      return smartViewport;
+    }
+    
+    // Final fallback
+    console.log('📍 Using default viewport');
     return { x: 10, y: 250, zoom: 0.75 };
   };
 
@@ -254,7 +273,7 @@ export default function FlowChart() {
     const columns = [];
 
     switch (timelineType) {
-      case 'daily':
+      case 'daily': {
         let currentDate = new Date(startDate);
         let columnIndex = 0;
 
@@ -279,8 +298,9 @@ export default function FlowChart() {
           currentDate.setDate(currentDate.getDate() + 1);
         }
         break;
+      }
 
-      case 'weekly':
+      case 'weekly': {
         let weekDate = new Date(startDate);
         let weekColumnIndex = 0;
 
@@ -307,8 +327,9 @@ export default function FlowChart() {
           weekDate.setDate(weekDate.getDate() + 7); // Next Monday
         }
         break;
+      }
 
-      case 'monthly':
+      case 'monthly': {
         let monthDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
         let monthColumnIndex = 0;
 
@@ -329,6 +350,7 @@ export default function FlowChart() {
           monthDate.setMonth(monthDate.getMonth() + 1);
         }
         break;
+      }
     }
 
     return columns;
@@ -390,19 +412,65 @@ export default function FlowChart() {
           position = { x: 150 + (index * 300), y: 460 };
         }
 
-        // Create milestone style with phase colors
+        // 📏 Calculate timeline-aware phase width based on phase duration
+        const calculatePhaseWidth = (phase, timelineColumns) => {
+          const minWidth = 180; // Minimum width for readability
+          const maxWidth = 600; // Maximum width to prevent oversized nodes
+          
+          // If no timeline or duration data, use default width
+          if (!timelineColumns.length || !phase.startDate || !phase.endDate) {
+            return nodeStyles.milestone.minWidth || 180;
+          }
+          
+          // Calculate phase duration in days
+          const phaseDurationMs = phase.endDate - phase.startDate;
+          const phaseDurationDays = Math.ceil(phaseDurationMs / (1000 * 60 * 60 * 24));
+          
+          // Calculate width based on timeline column width and phase duration
+          const columnWidth = timelineColumns[0]?.width || 120;
+          const timelineType = clickupData?.timeline?.timelineType || 'monthly';
+          let widthMultiplier = 1;
+          
+          switch (timelineType) {
+            case 'daily':
+              widthMultiplier = phaseDurationDays;
+              break;
+            case 'weekly':
+              widthMultiplier = phaseDurationDays / 7;
+              break;
+            case 'monthly':
+              widthMultiplier = phaseDurationDays / 30;
+              break;
+            default:
+              widthMultiplier = phaseDurationDays / 30;
+          }
+          
+          const calculatedWidth = columnWidth * widthMultiplier;
+          return Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
+        };
+
+        const phaseWidth = calculatePhaseWidth(phase, timelineColumns);
+
+        // Create milestone style with phase colors and timeline-aware width
         const phaseStyle = {
           ...nodeStyles.milestone,
           border: `3px solid ${phase.color}`,
+          minWidth: `${phaseWidth}px`,
+          width: `${phaseWidth}px`,
+          maxWidth: `${phaseWidth}px`
         };
 
-        // 📅 Enhanced phase label with timeline info
+        // 📅 Enhanced phase label with timeline info and duration
         let phaseLabel = `${phase.emoji} Phase ${phase.phase}\n${phase.name}\n(${phase.totalTasks} tasks, ${phase.averageCompletion}%)`;
 
         if (phase.startDate && phase.endDate) {
           const startStr = phase.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const endStr = phase.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const phaseDurationMs = phase.endDate - phase.startDate;
+          const phaseDurationDays = Math.ceil(phaseDurationMs / (1000 * 60 * 60 * 24));
+          
           phaseLabel += `\n📅 ${startStr} - ${endStr}`;
+          phaseLabel += `\n⏱️ ${phaseDurationDays} day${phaseDurationDays > 1 ? 's' : ''}`;
         }
 
         phaseLabel += '\n(Double-click to expand)';
@@ -444,7 +512,7 @@ export default function FlowChart() {
 
             if (taskDate) {
               // Find which tasks are in the same column
-              Object.entries(groupedTasks).forEach(([columnIndex, tasksInColumn]) => {
+              Object.entries(groupedTasks).forEach(([, tasksInColumn]) => {
                 const taskInColumn = tasksInColumn.findIndex(t => t.id === task.id);
                 if (taskInColumn !== -1) {
                   taskIndexInColumn = taskInColumn;
@@ -463,27 +531,78 @@ export default function FlowChart() {
             position = { x: xPosition, y: yPosition };
           }
 
-          // Create task style with status-based coloring
+          // 📏 Calculate timeline-aware node width based on task duration
+          const calculateTimelineWidth = (task, timelineColumns) => {
+            const minWidth = 60; // Minimum width for readability
+            const maxWidth = 400; // Maximum width to prevent oversized nodes
+            
+            // If no timeline or duration data, use default width
+            if (!timelineColumns.length || !task.timeEstimateDays) {
+              return nodeStyles.task.minWidth || 140;
+            }
+            
+            // Calculate width based on timeline column width and task duration
+            const columnWidth = timelineColumns[0]?.width || 120;
+            const taskDurationDays = task.timeEstimateDays;
+            
+            // For different timeline types, adjust the calculation
+            const timelineType = clickupData?.timeline?.timelineType || 'monthly';
+            let widthMultiplier = 1;
+            
+            switch (timelineType) {
+              case 'daily':
+                // Each day = one column width
+                widthMultiplier = taskDurationDays;
+                break;
+              case 'weekly':
+                // Each week = one column width, so divide days by 7
+                widthMultiplier = taskDurationDays / 7;
+                break;
+              case 'monthly':
+                // Each month = one column width, so divide days by 30
+                widthMultiplier = taskDurationDays / 30;
+                break;
+              default:
+                widthMultiplier = taskDurationDays / 30;
+            }
+            
+            const calculatedWidth = columnWidth * widthMultiplier;
+            
+            // Ensure width is within reasonable bounds
+            return Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
+          };
+
+          // Create task style with status-based coloring and timeline-aware width
           const completionColor = task.percentComplete === 100 ? '#4caf50' :
             task.percentComplete > 0 ? '#ff9800' : '#9c27b0';
+
+          const timelineWidth = calculateTimelineWidth(task, timelineColumns);
 
           const taskStyle = {
             ...nodeStyles.task,
             border: `2px solid ${completionColor}`,
             background: task.percentComplete === 100 ? '#e8f5e8' :
-              task.percentComplete > 0 ? '#fff3e0' : '#f3e5f5'
+              task.percentComplete > 0 ? '#fff3e0' : '#f3e5f5',
+            minWidth: `${timelineWidth}px`,
+            width: `${timelineWidth}px`,
+            maxWidth: `${timelineWidth}px`
           };
 
-          // 📅 Enhanced task label with timeline info
-          let taskLabel = `${task.name}\n(${task.percentComplete}% complete)`;
+          // 🏷️ Compact task label - just show task ID for small nodes
+          const taskLabel = `#${task.id}`;
 
-          if (task.dueDate) {
-            const dueStr = new Date(parseInt(task.dueDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            taskLabel += `\n📅 Due: ${dueStr}`;
-          } else if (task.startDate) {
-            const startStr = new Date(parseInt(task.startDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            taskLabel += `\n📅 Start: ${startStr}`;
-          }
+          // 📋 Create detailed tooltip data for hover
+          const tooltipData = {
+            id: task.id,
+            name: task.name,
+            percentComplete: task.percentComplete,
+            timeEstimateDays: task.timeEstimateDays,
+            dueDate: task.dueDate,
+            startDate: task.startDate,
+            assignees: task.assignees || [],
+            priority: task.priority || 'Normal',
+            status: task.status || 'Open'
+          };
 
           taskNodes.push({
             id: nodeId,
@@ -492,7 +611,8 @@ export default function FlowChart() {
             data: {
               label: taskLabel,
               taskData: task, // Store task data for reference
-              parentPhase: phase.phase
+              parentPhase: phase.phase,
+              tooltip: tooltipData // Store tooltip data for hover
             },
             style: taskStyle
           });
@@ -684,7 +804,7 @@ export default function FlowChart() {
     }
   }, [onEdgesChange, deleteConnection, getStorageKey]);
 
-  // Load saved viewport on component mount and when project changes
+  // Load saved viewport on component mount and when project/timeline changes
   useEffect(() => {
     const savedViewport = loadSavedViewport();
     // 📅 Update current viewport state for timeline header sync
@@ -695,7 +815,7 @@ export default function FlowChart() {
         reactFlowInstance.setViewport(savedViewport);
       }, 100); // Small delay to ensure ReactFlow is ready
     }
-  }, [reactFlowInstance, selectedProject]); // Re-run when project changes too
+  }, [reactFlowInstance, selectedProject, timelineColumns, clickupData]); // Re-run when timeline data changes
 
   // Load saved handle configurations on component mount
   useEffect(() => {
@@ -940,8 +1060,26 @@ export default function FlowChart() {
         newExpanded.add(node.id);
       }
       setExpandedMilestones(newExpanded);
-    } else {
     }
+  };
+
+  // 🏷️ Mouse event handlers for task tooltips
+  const handleNodeMouseEnter = (event, node) => {
+    if (node.type === 'task' && node.data.tooltip) {
+      const rect = event.target.getBoundingClientRect();
+      setTooltip({
+        visible: true,
+        data: node.data.tooltip,
+        position: {
+          x: rect.left + rect.width / 2,
+          y: rect.top
+        }
+      });
+    }
+  };
+
+  const handleNodeMouseLeave = () => {
+    setTooltip({ visible: false, data: null, position: { x: 0, y: 0 } });
   };
 
   const toggleAllTasks = () => {
@@ -1017,6 +1155,8 @@ export default function FlowChart() {
       setCurrentViewport(newViewport);
     }
   };
+
+
 
   // Focus on specific level
   const focusLevel = (level) => {
@@ -1154,502 +1294,42 @@ export default function FlowChart() {
 
   return (
     <>
-      {/* Status Indicators - Top Left */}
-      {/* <div className="fixed left-4 z-30 bg-white rounded-lg shadow-md border border-gray-200 text-sm" style={{ top: '84px' }}>
-        <div className="font-medium text-gray-700 text-sm flex items-center gap-1.5 p-3">
-          <Settings size={16} className="text-blue-600" />
-          <span>Status</span>
-          {(isInitializing || isLoadingClickupData) && (
-            <span className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-              <RotateCcw size={12} className="animate-spin" />
-              LOADING
-            </span>
-          )}
-          {!isInitializing && !isLoadingClickupData && clickupData && (
-            <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-              <CheckCircle size={12} />
-              CLICKUP
-            </span>
-          )}
-          {!isInitializing && !isLoadingClickupData && !clickupData && (
-            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-              <XCircle size={12} />
-              ERROR
-            </span>
-          )}
-        </div>
-      </div> */}
-
       {/* Professional Website Header */}
-      <header className="fixed top-0 left-0 w-full bg-white z-20 border-b border-gray-200 shadow-sm" style={{ height: '72px' }}>
-        <div className="flex items-center justify-between h-full px-6">
-          {/* Left Section - Logo & Navigation */}
-          <div className="flex items-center space-x-8">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <img
-                src="https://siliconsigns.com/wp-content/uploads/2024/02/cropped-logo_new-235x37.png"
-                alt="Silicon Signs Logo"
-                className="w-32 h-10 object-contain"
-              />
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-gray-900">FlowChart</span>
-                <span className="text-xs text-gray-500 -mt-1">Project Management</span>
-              </div>
-            </div>
-
-            {/* Header Dropdowns */}
-            <nav className="hidden md:flex items-center space-x-6">
-              {/* Legend Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setActiveHeaderDropdown(activeHeaderDropdown === 'legend' ? null : 'legend')}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  <Layers className="w-4 h-4" />
-                  <span className="text-sm font-medium">Legend</span>
-                  <ChevronDown className={`w-3 h-3 transition-transform ${activeHeaderDropdown === 'legend' ? 'rotate-180' : ''}`} />
-                </button>
-
-                {activeHeaderDropdown === 'legend' && (
-                  <div className="absolute top-8 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 min-w-[280px]">
-                    <div className="space-y-4">
-                      <div className="font-semibold text-sm text-gray-800 mb-3">Node Types</div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-blue-100 border-2 border-blue-600 rounded"></div>
-                          <span className="text-sm text-gray-700">Automation Steps</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-orange-100 border-2 border-orange-600 rounded border-dashed"></div>
-                          <span className="text-sm text-gray-700">Decision Points</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-green-100 border-2 border-green-600 rounded-lg"></div>
-                          <span className="text-sm text-gray-700">Milestones (Double-click to expand)</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-purple-100 border-2 border-purple-600 rounded-sm"></div>
-                          <span className="text-sm text-gray-700">Individual Tasks</span>
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <div className="font-semibold text-sm text-gray-800 mb-2">Status Colors</div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 bg-green-500 rounded"></div>
-                            <span className="text-sm text-gray-700">Completed (100%)</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                            <span className="text-sm text-gray-700">In Progress</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 bg-purple-500 rounded"></div>
-                            <span className="text-sm text-gray-700">Not Started</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Controls Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setActiveHeaderDropdown(activeHeaderDropdown === 'controls' ? null : 'controls')}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  <Settings className="w-4 h-4" />
-                  <span className="text-sm font-medium">Controls</span>
-                  <ChevronDown className={`w-3 h-3 transition-transform ${activeHeaderDropdown === 'controls' ? 'rotate-180' : ''}`} />
-                </button>
-
-                {activeHeaderDropdown === 'controls' && (
-                  <div className="absolute top-8 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 min-w-[320px]">
-                    <div className="space-y-4">
-                      <div className="font-semibold text-sm text-gray-800 mb-3">View Controls</div>
-
-                      <div className="space-y-3">
-                        <button
-                          onClick={() => { toggleAllTasks(); setActiveHeaderDropdown(null); }}
-                          className="w-full flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            {showAllTasks ? <FolderOpen size={16} /> : <Folder size={16} />}
-                            <span className="text-sm font-medium">{showAllTasks ? 'Collapse Tasks' : 'Expand Tasks'}</span>
-                          </div>
-                        </button>
-
-                        <button
-                          onClick={() => { setShowHandles(!showHandles); setActiveHeaderDropdown(null); }}
-                          className="w-full flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Link size={16} />
-                            <span className="text-sm font-medium">{showHandles ? 'Hide Handles' : 'Show Handles'}</span>
-                          </div>
-                        </button>
-
-                        <div className="p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Calendar size={16} />
-                            <span className="text-sm font-medium">Calendar Opacity</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={calendarOpacity}
-                            onChange={(e) => setCalendarOpacity(parseFloat(e.target.value))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <div className="text-xs text-gray-500 text-center mt-1">{Math.round(calendarOpacity * 100)}%</div>
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <div className="font-semibold text-sm text-gray-800 mb-2">Navigation</div>
-                        <select
-                          onChange={(e) => {
-                            const level = parseInt(e.target.value);
-                            if (level === 0) resetView();
-                            else focusLevel(level);
-                            setActiveHeaderDropdown(null);
-                            e.target.value = "0";
-                          }}
-                          className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
-                        >
-                          <option value="0">📍 Jump to Level</option>
-                          <option value="1">📍 CRM Logic</option>
-                          <option value="2">📍 Project Phases</option>
-                          <option value="3">📍 Task Details</option>
-                        </select>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <div className="font-semibold text-sm text-gray-800 mb-2">Actions</div>
-                        <div className="space-y-2">
-                          <button
-                            onClick={() => { saveCurrentLayoutAsDefault(); setActiveHeaderDropdown(null); }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors"
-                          >
-                            <Save size={14} />
-                            <span className="text-sm">Save Layout</span>
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const processedData = await clickupApi.getProcessedTemplateData();
-                                alert(`✅ API Test Complete! Found ${processedData.summary.totalTasks} tasks across ${processedData.summary.totalPhases} phases. Check console for details.`);
-                              } catch (error) {
-                                console.error('❌ Manual API test failed:', error);
-                                alert(`❌ API Test Failed: ${error.message}`);
-                              }
-                              setActiveHeaderDropdown(null);
-                            }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors"
-                          >
-                            <TestTube size={14} />
-                            <span className="text-sm">Test ClickUp API</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <div className="font-semibold text-sm text-gray-800 mb-2">Reset Options</div>
-                        <div className="space-y-2">
-                          <button
-                            onClick={() => { resetView(); setActiveHeaderDropdown(null); }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
-                          >
-                            <RotateCcw size={14} />
-                            <span className="text-sm">Reset View</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              const key = getStorageKey('flowchart-node-positions');
-                              localStorage.removeItem(key);
-                              setNodes(getVisibleNodes());
-                              setActiveHeaderDropdown(null);
-                            }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
-                          >
-                            <MapPin size={14} />
-                            <span className="text-sm">Reset Positions</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              const key = getStorageKey('flowchart-handle-configs');
-                              localStorage.removeItem(key);
-                              setNodeHandleConfigs({});
-                              setActiveHeaderDropdown(null);
-                            }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
-                          >
-                            <Link size={14} />
-                            <span className="text-sm">Reset Handles</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              const customConnectionsKey = getStorageKey('flowchart-custom-connections');
-                              const connectionModsKey = getStorageKey('flowchart-connection-mods');
-                              localStorage.removeItem(customConnectionsKey);
-                              localStorage.removeItem(connectionModsKey);
-                              setEdges(getVisibleEdges());
-                              setActiveHeaderDropdown(null);
-                            }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
-                          >
-                            <Link size={14} />
-                            <span className="text-sm">Reset Connections</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              const key = getStorageKey('flowchart-node-labels');
-                              localStorage.removeItem(key);
-                              setNodeLabels({});
-                              setActiveHeaderDropdown(null);
-                            }}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors"
-                          >
-                            <RotateCcw size={14} />
-                            <span className="text-sm">Reset Text</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </nav>
-          </div>
-
-          {/* Center Section - Project Title */}
-          <div className="flex-1 flex justify-center">
-            <div className="text-center max-w-md">
-              <h1 className="text-lg font-semibold text-gray-900">
-                Franchise Project Template
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {selectedProject ?
-                  `Viewing for: ${selectedProject.customerFolder} • ${selectedProject.name}` :
-                  'Standard franchise project workflow'
-                }
-                {/* 📅 Timeline status indicator */}
-                {clickupData?.timeline && (
-                  <span className="block px-2 py-1 text-blue-700 rounded-md text-xs font-medium">
-                    Timeline: <span className='capitalize'>{clickupData.timeline.timelineType}</span>
-                    ({clickupData.timeline.duration} days)
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Right Section - Actions & Profile */}
-          <div className="flex items-center space-x-4">
-            {/* Project Selector */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowProjectDropdown(!showProjectDropdown);
-                  setActiveHeaderDropdown(null);
-                  // Clear search and reset folder states when opening
-                  if (!showProjectDropdown) {
-                    setSearchTerm('');
-                    setExpandedFolders(new Set());
-                  }
-                }}
-                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <Briefcase className="w-4 h-4 text-gray-600" />
-                <span className="text-gray-700 font-medium max-w-32 truncate">
-                  {selectedProject ? `${selectedProject.customerFolder} • ${selectedProject.name}` : isLoadingProjects ? 'Loading...' : 'Select Location'}
-                </span>
-                <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
-                {isLoadingProjects && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
-              </button>
-
-              {showProjectDropdown && (
-                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[320px] max-h-[400px] overflow-hidden flex flex-col">
-                  {/* Header and Search */}
-                  <div className="p-3 border-b border-gray-100">
-                    <div className="font-semibold text-sm text-gray-800 mb-2">Franchise Locations</div>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search folders or locations..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Content Area */}
-                  <div className="flex-1 overflow-y-auto p-2">
-                    {/* Loading State */}
-                    {isLoadingProjects && (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin mr-2" />
-                        <span className="text-sm text-gray-600">Loading locations...</span>
-                      </div>
-                    )}
-
-                    {/* Franchise Locations by Customer (Collapsible) */}
-                    {!isLoadingProjects && projects.length > 0 && (
-                      <div className="space-y-1">
-                        {(() => {
-                          // Group filtered projects by customer folder
-                          const filteredProjects = getFilteredProjects();
-                          const groupedProjects = filteredProjects.reduce((groups, project) => {
-                            const customerFolder = project.customerFolder || 'Other';
-                            if (!groups[customerFolder]) {
-                              groups[customerFolder] = [];
-                            }
-                            groups[customerFolder].push(project);
-                            return groups;
-                          }, {});
-
-                          return Object.entries(groupedProjects)
-                            .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([customerFolder, locations]) => {
-                              const isExpanded = expandedFolders.has(customerFolder);
-
-                              return (
-                                <div key={customerFolder} className="mb-1">
-                                  {/* Customer Folder Header - Clickable */}
-                                  <button
-                                    onClick={() => toggleFolder(customerFolder)}
-                                    className="w-full flex items-center justify-between px-3 py-2 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <ChevronDown
-                                        className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'
-                                          }`}
-                                      />
-                                      <Folder className="w-4 h-4 text-gray-600" />
-                                      <span className="text-sm font-semibold text-gray-800">
-                                        {customerFolder}
-                                      </span>
-                                    </div>
-                                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-                                      {locations.length}
-                                    </span>
-                                  </button>
-
-                                  {/* Locations within this customer - Collapsible */}
-                                  {isExpanded && (
-                                    <div className="ml-6 mt-1 space-y-1">
-                                      {locations.map((project) => (
-                                        <button
-                                          key={project.id}
-                                          onClick={() => handleProjectSelect(project)}
-                                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedProject?.id === project.id
-                                            ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-500'
-                                            : 'hover:bg-gray-50 text-gray-700'
-                                            }`}
-                                        >
-                                          <div className="flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"></div>
-                                            <div className="flex-1 min-w-0">
-                                              <div className="font-medium truncate">{project.name}</div>
-                                              <div className="text-xs text-gray-500">
-                                                {project.taskCount} tasks
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            });
-                        })()}
-                      </div>
-                    )}
-
-                    {/* Empty State */}
-                    {!isLoadingProjects && projects.length === 0 && (
-                      <div className="text-center py-8">
-                        <Briefcase className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <div className="text-sm text-gray-600 mb-1">No franchise locations found</div>
-                        <div className="text-xs text-gray-500">Check your ClickUp Projects space</div>
-                      </div>
-                    )}
-
-                    {/* No Search Results */}
-                    {!isLoadingProjects && projects.length > 0 && getFilteredProjects().length === 0 && (
-                      <div className="text-center py-8">
-                        <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <div className="text-sm text-gray-600 mb-1">No matches found</div>
-                        <div className="text-xs text-gray-500">Try a different search term</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Search */}
-            <div className="hidden lg:flex items-center">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search nodes..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* System Status */}
-            <div className="relative p-2 text-gray-500 rounded-lg">
-              {(isInitializing || isLoadingClickupData) ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-amber-600 font-medium">Loading</span>
-                </div>
-              ) : clickupData ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-green-600 font-medium">Connected</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-sm text-red-600 font-medium">Offline</span>
-                </div>
-              )}
-            </div>
-
-            {/* User Profile */}
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-gray-600" />
-              </div>
-              <div className="hidden md:block">
-                <p className="text-sm font-medium text-gray-900">Admin User</p>
-                <p className="text-xs text-gray-500">Project Manager</p>
-              </div>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Hidden - Legend moved to header */}
+      <FlowChartHeader
+        activeHeaderDropdown={activeHeaderDropdown}
+        setActiveHeaderDropdown={setActiveHeaderDropdown}
+        showAllTasks={showAllTasks}
+        toggleAllTasks={toggleAllTasks}
+        showHandles={showHandles}
+        setShowHandles={setShowHandles}
+        calendarOpacity={calendarOpacity}
+        setCalendarOpacity={setCalendarOpacity}
+        selectedProject={selectedProject}
+        projects={projects}
+        isLoadingProjects={isLoadingProjects}
+        showProjectDropdown={showProjectDropdown}
+        setShowProjectDropdown={setShowProjectDropdown}
+        isInitializing={isInitializing}
+        isLoadingClickupData={isLoadingClickupData}
+        clickupData={clickupData}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        expandedFolders={expandedFolders}
+        setExpandedFolders={setExpandedFolders}
+        resetView={resetView}
+        focusLevel={focusLevel}
+        saveCurrentLayoutAsDefault={saveCurrentLayoutAsDefault}
+        getStorageKey={getStorageKey}
+        setNodes={setNodes}
+        getVisibleNodes={getVisibleNodes}
+        setNodeHandleConfigs={setNodeHandleConfigs}
+        setEdges={setEdges}
+        getVisibleEdges={getVisibleEdges}
+        setNodeLabels={setNodeLabels}
+        handleProjectSelect={handleProjectSelect}
+        toggleFolder={toggleFolder}
+        getFilteredProjects={getFilteredProjects}
+      />
 
       {/* Clean Context Menu for Handle Configuration */}
       {contextMenu && (
@@ -1844,72 +1524,18 @@ export default function FlowChart() {
         </div>
       )}
 
-      {/* Loading State */}
-      {(isInitializing || isLoadingClickupData) && (
-        <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center z-[2000]">
-          <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md mx-4 border border-gray-100">
-            <div className="flex justify-center mb-6">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-blue-100 rounded-full"></div>
-                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
-                <Loader2 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-500" size={24} />
-              </div>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">
-              {isInitializing ? 'Initializing Application' : 'Loading Project Data'}
-            </h3>
-            <p className="text-gray-600 leading-relaxed">
-              {isInitializing
-                ? 'Loading franchise locations and project data from ClickUp workspace...'
-                : 'Loading project phases and tasks from ClickUp workspace...'
-              }
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-blue-600">
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse animation-delay-150"></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse animation-delay-300"></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error State */}
-      {!isInitializing && !isLoadingClickupData && !clickupData && (
-        <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-sm flex items-center justify-center z-[2000]">
-          <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-lg mx-4 border border-gray-100">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
-                <AlertTriangle className="text-red-500" size={32} />
-              </div>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">ClickUp Data Unavailable</h3>
-            <p className="text-gray-600 leading-relaxed mb-6">
-              Unable to load ClickUp project data. Please check your API token configuration and internet connection.
-            </p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <div className="flex items-start gap-3">
-                <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={16} />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-red-800 mb-1">Connection Failed</p>
-                  <p className="text-xs text-red-600">Verify your ClickUp API token and network connectivity</p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={async () => {
-                setIsInitializing(true);
-                setSelectedProject(null);
-                setProjects([]);
-                // Restart the initialization process
-              }}
-              className="bg-blue-500 hover:bg-blue-600 text-white border-none px-6 py-3 rounded-lg cursor-pointer text-sm font-semibold flex items-center gap-2 mx-auto transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              <RefreshCw size={16} />
-              <span>Retry Loading</span>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Loading and Error States */}
+      <LoadingErrorStates
+        isInitializing={isInitializing}
+        isLoadingClickupData={isLoadingClickupData}
+        clickupData={clickupData}
+        onRetry={async () => {
+          setIsInitializing(true);
+          setSelectedProject(null);
+          setProjects([]);
+          // Restart the initialization process
+        }}
+      />
 
       {/* ReactFlow Container with Calendar Background */}
       <div className="reactflow-wrapper relative" style={{
@@ -1989,6 +1615,8 @@ export default function FlowChart() {
           onConnect={onConnect}
           onNodeDoubleClick={handleNodeDoubleClick}
           onNodeContextMenu={handleNodeContextMenu}
+          onNodeMouseEnter={handleNodeMouseEnter}
+          onNodeMouseLeave={handleNodeMouseLeave}
           onViewportChange={handleViewportChange}
           defaultViewport={loadSavedViewport()}
           className={`bg-[#f8f9fa] w-full h-full`}
@@ -2019,6 +1647,13 @@ export default function FlowChart() {
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
           <Controls />
         </ReactFlow>
+
+        {/* 🏷️ Task Tooltip */}
+        <TaskTooltip
+          tooltipData={tooltip.data}
+          position={tooltip.position}
+          visible={tooltip.visible}
+        />
       </div>
     </>
   );
